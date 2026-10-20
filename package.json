@@ -1,0 +1,17 @@
+{
+  "name": "notes-fullstack-app",
+  "version": "1.0.0",
+  "description": "Full-stack application boilerplate with React (Vite) + Tailwind CSS, Node.js/Express, and MongoDB",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start:backend": "npm --prefix backend start",
+    "build:frontend": "npm --prefix frontend run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
