@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { getBookmarkCount } from "../utils/bookmarkStorage";
 
 export default function Feedback({
   onNavigateToDashboard,
   onNavigateToSettings,
+  onNavigateToBookmark,
   onNavigateToHome,
   isDarkMode: propIsDarkMode,
   onToggleTheme,
@@ -14,6 +16,13 @@ export default function Feedback({
   const isDarkMode = propIsDarkMode !== undefined ? propIsDarkMode : ctxDarkMode;
   const toggleTheme = onToggleTheme || ctxToggleTheme;
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+
+  useEffect(() => {
+    const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
+    window.addEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+    return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+  }, []);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comments, setComments] = useState("");
@@ -238,25 +247,24 @@ export default function Feedback({
               <span>Dashboard</span>
             </button>
 
-            {/* My Progress */}
-            <button
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <span>My Progress (0)</span>
-            </button>
 
             {/* Bookmark */}
             <button
-              onClick={onNavigateToDashboard}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
+              onClick={() => {
+                if (onNavigateToBookmark) onNavigateToBookmark();
+                else onNavigateToDashboard();
+              }}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              <span>Bookmark (0)</span>
+              <div className="flex items-center gap-3">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>Bookmark</span>
+              </div>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {bookmarkCount}
+              </span>
             </button>
 
             {/* Rate & Feedback (Active!) */}

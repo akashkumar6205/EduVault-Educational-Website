@@ -326,6 +326,7 @@ export default function Resources({
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Options</p>
               <div className="space-y-1">
+
                 <button
                   onClick={onNavigateToFeedback}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400 transition-all cursor-pointer"
@@ -493,7 +494,7 @@ export default function Resources({
                   selectedResource?.id === res.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
                 }`}
               >
-                <div className="w-12 h-12 rounded-xl bg-sky-50  flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
+                <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
                   {res.icon}
                 </div>
 
@@ -518,3 +519,4 @@ export default function Resources({
     </div>
   );
 }
+

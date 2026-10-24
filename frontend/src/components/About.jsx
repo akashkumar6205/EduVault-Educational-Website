@@ -50,6 +50,13 @@ function About() {
         setOpenFaq(openFaq === index ? null : index);
     };
 
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
+
     return (
         <div id="about" ref={sectionRef} className="w-full bg-[#0d0c0b] text-slate-200">
             {/* ─────────────────────────────────────────────────────────────
@@ -226,7 +233,7 @@ function About() {
             {/* ─────────────────────────────────────────────────────────────
           SECTION 3: Footer (Clean Horizontal Bar)
          ───────────────────────────────────────────────────────────── */}
-            <footer className="w-full bg-white border-t border-slate-200 px-6 py-8 md:px-12 lg:px-20 text-slate-700 ">
+            <footer className="relative w-full bg-white border-t border-slate-200 px-6 py-8 md:px-12 lg:px-20 text-slate-700">
                 <div className="mx-auto flex flex-col md:flex-row items-center justify-between gap-6 max-w-7xl">
                     {/* Brand + Version Badge */}
                     <div className="flex items-center gap-3">
@@ -259,9 +266,33 @@ function About() {
                         ))}
                     </nav>
 
-                    {/* Copyright */}
-                    <div className="text-sm text-slate-400" style={{ fontFamily: "var(--font-sans)" }}>
-                        © 2026 EduVault. All rights reserved.
+                    {/* Right Section: Copyright & Back to Top Button */}
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <div className="text-sm text-slate-400" style={{ fontFamily: "var(--font-sans)" }}>
+                            © 2026 EduVault. All rights reserved.
+                        </div>
+
+                        {/* Back to Top Button on the bottom right of the footer */}
+                        <button
+                            onClick={scrollToTop}
+                            className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition-all duration-300 hover:bg-[#d4a03d] hover:border-[#d4a03d] hover:text-gray-900 hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                            title="Back to Top"
+                            aria-label="Back to top"
+                        >
+                            <span>Back to Top</span>
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200/80 group-hover:bg-black/10 transition-colors">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-3 w-3 transition-transform duration-300 group-hover:-translate-y-0.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                                </svg>
+                            </span>
+                        </button>
                     </div>
                 </div>
             </footer>

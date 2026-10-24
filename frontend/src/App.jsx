@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Home from "./components/Home";
 import Dashboard from "./components/Dashboard";
+import Bookmark from "./components/Bookmark";
 import Settings from "./components/Settings";
 import Courses from "./pages/courses";
 import Branch from "./pages/Branch";
@@ -15,7 +16,7 @@ import { ThemeProvider, useTheme } from "./context/ThemeContext";
 function MainApp() {
   const { user, loading } = useAuth();
   const { theme, setTheme, isDarkMode, toggleTheme } = useTheme();
-  const [view, setView] = useState(null); // "home", "dashboard", "courses", "branch", "semester", "subject", "resources", "unit", "settings", "feedback"
+  const [view, setView] = useState(null); // "home", "dashboard", "courses", "branch", "semester", "subject", "resources", "unit", "settings", "feedback", "bookmark"
   const [selectedUniversity, setSelectedUniversity] = useState({
     code: "RGPV",
     name: "Rajiv Gandhi Proudyogiki Vishwavidyalaya",
@@ -37,7 +38,7 @@ function MainApp() {
   // Auto route to Dashboard when user signs in
   useEffect(() => {
     if (user) {
-      setView((prev) => (prev === "settings" || prev === "courses" || prev === "branch" || prev === "semester" || prev === "subject" || prev === "resources" || prev === "unit" || prev === "feedback" ? prev : "dashboard"));
+      setView((prev) => (prev === "settings" || prev === "courses" || prev === "branch" || prev === "semester" || prev === "subject" || prev === "resources" || prev === "unit" || prev === "feedback" || prev === "bookmark" ? prev : "dashboard"));
     } else {
       setView("home");
     }
@@ -62,6 +63,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToHome={() => setView("home")}
         onNavigateToSettings={() => setView("settings")}
         onNavigateToFeedback={() => setView("feedback")}
@@ -82,6 +84,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToCourses={() => setView("courses")}
         onNavigateToHome={() => setView("home")}
         onNavigateToSettings={() => setView("settings")}
@@ -104,6 +107,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToCourses={() => setView("courses")}
         onNavigateToBranch={() => setView("branch")}
         onNavigateToHome={() => setView("home")}
@@ -128,6 +132,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToCourses={() => setView("courses")}
         onNavigateToBranch={() => setView("branch")}
         onNavigateToSemester={() => setView("semester")}
@@ -158,6 +163,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToCourses={() => setView("courses")}
         onNavigateToBranch={() => setView("branch")}
         onNavigateToSemester={() => setView("semester")}
@@ -185,6 +191,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToCourses={() => setView("courses")}
         onNavigateToBranch={() => setView("branch")}
         onNavigateToSemester={() => setView("semester")}
@@ -204,6 +211,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToSettings={() => setView("settings")}
         onNavigateToHome={() => setView("home")}
       />
@@ -218,8 +226,25 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         onSaveTheme={(newTheme) => setTheme(newTheme)}
         onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToHome={() => setView("home")}
         onNavigateToFeedback={() => setView("feedback")}
+      />
+    );
+  }
+
+  if (view === "bookmark") {
+    return (
+      <Bookmark
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
+        theme={theme}
+        onNavigateToDashboard={() => setView("dashboard")}
+        onNavigateToSettings={() => setView("settings")}
+        onNavigateToFeedback={() => setView("feedback")}
+        onNavigateToHome={() => setView("home")}
+        onNavigateToResources={() => setView("resources")}
+        onNavigateToUnit={() => setView("unit")}
       />
     );
   }
@@ -233,6 +258,7 @@ function MainApp() {
         onToggleTheme={toggleTheme}
         theme={theme}
         onNavigateToHome={() => setView("home")}
+        onNavigateToBookmark={() => setView("bookmark")}
         onNavigateToSettings={() => setView("settings")}
         onNavigateToFeedback={() => setView("feedback")}
         onNavigateToCourses={(uni) => {

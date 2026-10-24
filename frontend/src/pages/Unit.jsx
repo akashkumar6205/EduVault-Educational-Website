@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import {
+  getBookmarkCount,
+  isBookmarked,
+  toggleBookmark,
+} from "../utils/bookmarkStorage";
 
 export default function Unit({
   university = { code: "RGPV", name: "Rajiv Gandhi Proudyogiki Vishwavidyalaya" },
@@ -16,6 +21,7 @@ export default function Unit({
   onNavigateToResources,
   onNavigateToSettings,
   onNavigateToFeedback,
+  onNavigateToBookmark,
   onNavigateToHome,
   onSelectUnit,
   isDarkMode: propIsDarkMode,
@@ -29,6 +35,19 @@ export default function Unit({
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState(null);
+  const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+  const [toastMessage, setToastMessage] = useState("");
+
+  useEffect(() => {
+    const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
+    window.addEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+    return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+  }, []);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 2500);
+  };
 
   // Official RGPV Portal Unit Syllabus Mapping (5 Units per subject)
   const rgpvUnitsMap = {
@@ -562,6 +581,22 @@ export default function Unit({
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Options</p>
               <div className="space-y-1">
+                {/* Bookmark navigation */}
+                <button
+                  onClick={onNavigateToBookmark}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                    <span>Bookmark</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    {bookmarkCount}
+                  </span>
+                </button>
+
                 <button
                   onClick={onNavigateToFeedback}
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400 transition-all cursor-pointer"
@@ -714,40 +749,96 @@ export default function Unit({
 
           {/* ─── Unit Cards Grid (Medium Card Size with Unit Number & Exact Name) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 max-w-5xl">
-            {filteredUnits.map((u) => (
-              <div
-                key={u.id}
-                onClick={() => handleUnitClick(u)}
-                className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer min-h-[125px] sm:min-h-[135px] ${
-                  isDarkMode
-                    ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
-                    : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
-                } ${
-                  selectedUnit?.id === u.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
-                }`}
-              >
-                <span className="text-[11px] font-black tracking-wider uppercase text-[#0284c7] bg-sky-50 dark:text-sky-300 px-3 py-1 rounded-md border border-sky-200/60 dark:border-sky-800/60 mb-2.5">
-                  {u.number}
-                </span>
+            {filteredUnits.map((u) => {
+              const bookmarkId = `${subject.code || subject.id}-${u.id}-notes`;
+              const bookmarked = isBookmarked(bookmarkId);
 
-                <h2
-                  className={`text-base font-bold tracking-tight transition-colors line-clamp-2 ${
+              const handleToggleUnitBookmark = (e) => {
+                e.stopPropagation();
+                const itemToSave = {
+                  id: bookmarkId,
+                  type: "notes",
+                  categoryLabel: "Handwritten Notes",
+                  title: `${subject.code ? `${subject.code} ` : ""}${u.number}: ${u.name}`,
+                  subject: subject.name,
+                  subjectCode: subject.code,
+                  semester: semester.name,
+                  branch: branch.code,
+                  university: university.code,
+                  unit: u.number,
+                  description: u.topics,
+                  date: "Saved",
+                };
+
+                const result = toggleBookmark(itemToSave);
+                showToast(
+                  result.bookmarked
+                    ? `Saved "${u.number} Notes" to Bookmarks!`
+                    : `Removed "${u.number} Notes" from Bookmarks`
+                );
+              };
+
+              return (
+                <div
+                  key={u.id}
+                  onClick={() => handleUnitClick(u)}
+                  className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer min-h-[125px] sm:min-h-[135px] ${
                     isDarkMode
-                      ? "text-white group-hover:text-[#38bdf8]"
-                      : "text-slate-800 group-hover:text-[#0284c7]"
+                      ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
+                      : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
+                  } ${
+                    selectedUnit?.id === u.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
                   }`}
                 >
-                  {u.name}
-                </h2>
+                  {/* Bookmark Button in Top Right */}
+                  <button
+                    onClick={handleToggleUnitBookmark}
+                    className={`absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                      bookmarked
+                        ? "text-[#0284c7] bg-sky-50 dark:bg-sky-950/70"
+                        : "text-slate-300 dark:text-slate-600 hover:text-[#0284c7] hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                    title={bookmarked ? "Remove bookmark" : "Save bookmark"}
+                  >
+                    <svg className="w-4 h-4" fill={bookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                  </button>
 
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 line-clamp-2 leading-relaxed">
-                  {u.topics}
-                </p>
-              </div>
-            ))}
+                  <span className="text-[11px] font-black tracking-wider uppercase text-[#0284c7] bg-sky-50 dark:text-sky-300 px-3 py-1 rounded-md border border-sky-200/60 dark:border-sky-800/60 mb-2.5">
+                    {u.number}
+                  </span>
+
+                  <h2
+                    className={`text-base font-bold tracking-tight transition-colors line-clamp-2 ${
+                      isDarkMode
+                        ? "text-white group-hover:text-[#38bdf8]"
+                        : "text-slate-800 group-hover:text-[#0284c7]"
+                    }`}
+                  >
+                    {u.name}
+                  </h2>
+
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                    {u.topics}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </main>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold animate-bounce">
+          <svg className="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
+
