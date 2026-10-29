@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { getBookmarkCount } from "../utils/bookmarkStorage";
+import { updateUserProfile } from "../services/api";
 
 export default function Settings({
   onNavigateToDashboard,
@@ -91,6 +92,22 @@ export default function Settings({
     }
     if (onSaveTheme) {
       onSaveTheme(themeMode);
+    }
+
+    // Sync profile to backend MongoDB if user is authenticated
+    if (user) {
+      updateUserProfile({
+        displayName,
+        preferences: {
+          university,
+          course,
+          branch,
+          semester,
+          theme: themeMode,
+        },
+      }).catch((err) => {
+        console.warn("[Backend Warning] Could not persist profile to server:", err.message);
+      });
     }
 
     setSavedToast(true);

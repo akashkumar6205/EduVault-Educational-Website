@@ -7,13 +7,13 @@ import { connectDB } from "./config/db.js";
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
-  // Connect to MongoDB
-  await connectDB();
-
-  // Start Express server
+  // Start Express server immediately
   const server = app.listen(PORT, () => {
-    console.log(`[Server] Server is running on http://localhost:${PORT}`);
+    console.log(`[Server] EduVault Backend running at http://localhost:${PORT}`);
   });
+
+  // Attempt database connection asynchronously
+  connectDB();
 
   // Handle process termination cleanly
   process.on("SIGINT", () => {

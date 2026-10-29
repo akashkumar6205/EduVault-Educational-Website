@@ -1,4 +1,6 @@
 // Utility for managing bookmarks across Notes, PYQs, and Important Questions
+import { toggleServerBookmark, clearServerBookmarks } from "../services/api";
+
 const STORAGE_KEY = "eduvault_bookmarks";
 
 // Known dummy sample bookmark IDs to prune if they exist in user's localStorage
@@ -65,6 +67,8 @@ export function saveBookmarks(list) {
  */
 export function clearAllBookmarks() {
   saveBookmarks([]);
+  // Non-blocking sync with backend
+  clearServerBookmarks().catch(() => {});
   return [];
 }
 
@@ -107,6 +111,10 @@ export function removeBookmark(id) {
  */
 export function toggleBookmark(item) {
   if (!item || !item.id) return { bookmarked: false, list: getBookmarks() };
+  
+  // Non-blocking sync with backend
+  toggleServerBookmark(item).catch(() => {});
+
   if (isBookmarked(item.id)) {
     return { bookmarked: false, list: removeBookmark(item.id) };
   } else {
