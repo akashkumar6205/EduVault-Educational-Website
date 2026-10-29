@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import {
+  getBookmarkCount,
+  isBookmarked,
+  toggleBookmark,
+} from "../utils/bookmarkStorage";
+import {
+  getMaterials,
+  recordMaterialView,
+  recordMaterialDownload,
+} from "../services/api";
+import { rgpvUnitsMap } from "../utils/curriculumData";
 
 export default function Resources({
   university = { code: "RGPV", name: "Rajiv Gandhi Proudyogiki Vishwavidyalaya" },
@@ -15,6 +26,7 @@ export default function Resources({
   onNavigateToSubject,
   onNavigateToSettings,
   onNavigateToFeedback,
+  onNavigateToBookmark,
   onNavigateToHome,
   onNavigateToUnit,
   onSelectResource,
@@ -29,6 +41,115 @@ export default function Resources({
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
+  const [showSyllabusModal, setShowSyllabusModal] = useState(false);
+  const [syllabusMaterial, setSyllabusMaterial] = useState(null);
+  const [loadingSyllabus, setLoadingSyllabus] = useState(false);
+  const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+  const [toastMessage, setToastMessage] = useState("");
+
+  const syllabusBookmarkId = `syllabus-${subject?.code || "BT101"}`;
+  const [syllabusIsBookmarked, setSyllabusIsBookmarked] = useState(() =>
+    isBookmarked(syllabusBookmarkId)
+  );
+
+  useEffect(() => {
+    const handleBookmarkChange = () => {
+      setBookmarkCount(getBookmarkCount());
+      setSyllabusIsBookmarked(isBookmarked(syllabusBookmarkId));
+    };
+    window.addEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+    return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+  }, [syllabusBookmarkId]);
+
+  // Fetch syllabus material if uploaded to backend
+  useEffect(() => {
+    if (!subject?.code) return;
+    setLoadingSyllabus(true);
+    getMaterials({
+      subjectCode: subject.code,
+      resourceType: "syllabus",
+    })
+      .then((res) => {
+        if (res?.data && res.data.length > 0) {
+          setSyllabusMaterial(res.data[0]);
+        } else {
+          setSyllabusMaterial({
+            _id: `syllabus-${subject.code}`,
+            title: `${subject.code} Official RGPV Syllabus`,
+            file: {
+              url: `https://ik.imagekit.io/eduvault_demo/syllabus/${subject.code.replace("-", "")}_Syllabus.pdf`,
+              fileName: `${subject.code}_Official_Syllabus.pdf`,
+              pagesCount: 4,
+            },
+            author: "RGPV Academic Council",
+          });
+        }
+      })
+      .catch(() => {
+        setSyllabusMaterial({
+          _id: `syllabus-${subject.code}`,
+          title: `${subject.code} Official RGPV Syllabus`,
+          file: {
+            url: `https://ik.imagekit.io/eduvault_demo/syllabus/${subject.code.replace("-", "")}_Syllabus.pdf`,
+            fileName: `${subject.code}_Official_Syllabus.pdf`,
+            pagesCount: 4,
+          },
+          author: "RGPV Academic Council",
+        });
+      })
+      .finally(() => setLoadingSyllabus(false));
+  }, [subject]);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 2800);
+  };
+
+  const defaultSyllabusUrl =
+    syllabusMaterial?.file?.url ||
+    `https://ik.imagekit.io/eduvault_demo/syllabus/${(subject?.code || "BT101").replace("-", "")}_Syllabus.pdf`;
+
+  const handleOpenSyllabusPdf = () => {
+    if (syllabusMaterial?._id && !syllabusMaterial._id.startsWith("syllabus-")) {
+      recordMaterialView(syllabusMaterial._id).catch(() => {});
+    }
+    window.open(defaultSyllabusUrl, "_blank", "noopener,noreferrer");
+    showToast("Opening Official Syllabus PDF from ImageKit...");
+  };
+
+  const handleDownloadSyllabusPdf = () => {
+    if (syllabusMaterial?._id && !syllabusMaterial._id.startsWith("syllabus-")) {
+      recordMaterialDownload(syllabusMaterial._id).catch(() => {});
+    }
+    window.open(defaultSyllabusUrl, "_blank", "noopener,noreferrer");
+    showToast("Starting Syllabus PDF download...");
+  };
+
+  const handleToggleSyllabusBookmark = (e) => {
+    if (e) e.stopPropagation();
+    const itemToSave = {
+      id: syllabusBookmarkId,
+      type: "syllabus",
+      categoryLabel: "Official Syllabus",
+      title: `${subject.code ? `${subject.code} ` : ""}Syllabus: ${subject.name}`,
+      subject: subject.name,
+      subjectCode: subject.code,
+      semester: semester.name,
+      branch: branch.code,
+      university: university.code,
+      description: `Official RGPV curriculum outline for ${subject.name} (${subject.code})`,
+      fileUrl: defaultSyllabusUrl,
+      date: "Saved",
+    };
+
+    const res = toggleBookmark(itemToSave);
+    setSyllabusIsBookmarked(res.bookmarked);
+    showToast(
+      res.bookmarked
+        ? `Saved "${subject.code} Syllabus" to Bookmarks!`
+        : `Removed "${subject.code} Syllabus" from Bookmarks`
+    );
+  };
 
   // Four resources requested
   const resourcesList = [
@@ -36,6 +157,7 @@ export default function Resources({
       id: "handwritten-notes",
       name: "Handwritten Notes",
       subtitle: "Verified chapter-wise notes",
+      actionText: "Browse Units →",
       icon: (
         <svg className="w-6 h-6 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -46,6 +168,7 @@ export default function Resources({
       id: "pyq",
       name: "PYQ",
       subtitle: "Previous year question papers",
+      actionText: "View PYQs →",
       icon: (
         <svg className="w-6 h-6 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -56,6 +179,8 @@ export default function Resources({
       id: "syllabus",
       name: "Syllabus",
       subtitle: "Official RGPV curriculum outline",
+      actionText: "View PDF",
+      hasPdfButton: true,
       icon: (
         <svg className="w-6 h-6 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -66,6 +191,7 @@ export default function Resources({
       id: "unit-wise-important",
       name: "Unit Wise Important",
       subtitle: "High-yield repeated exam topics",
+      actionText: "View Topics →",
       icon: (
         <svg className="w-6 h-6 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -83,10 +209,21 @@ export default function Resources({
     setSelectedResource(res);
     if (res.id === "handwritten-notes" && onNavigateToUnit) {
       onNavigateToUnit(res, subject);
+    } else if (res.id === "syllabus") {
+      setShowSyllabusModal(true);
     } else if (onSelectResource) {
       onSelectResource(res);
     }
   };
+
+  const subjectKey = subject?.code?.toUpperCase();
+  const currentUnits = rgpvUnitsMap[subjectKey] || [
+    { id: "u1", number: "UNIT I", name: "Fundamentals & Core Concepts", topics: "Basic definitions, Introduction, Mathematical foundations, Core theorems and architecture" },
+    { id: "u2", number: "UNIT II", name: "Methods & Algorithmic Analysis", topics: "Key algorithmic techniques, Methodologies, Mathematical formulations, Practical structures" },
+    { id: "u3", number: "UNIT III", name: "Intermediate Systems & Applications", topics: "Detailed system design, Standard methods, Real-world applications and structural models" },
+    { id: "u4", number: "UNIT IV", name: "Advanced Optimization & Design", topics: "Advanced design patterns, Performance optimization, Analytical frameworks and evaluation" },
+    { id: "u5", number: "UNIT V", name: "Emerging Technologies & Case Studies", topics: "Current industry trends, Case studies, Advanced implementations and standard practices" },
+  ];
 
   const displayName = user?.displayName || "Student User";
   const displayEmail = user?.email || "student@eduvault.io";
@@ -142,6 +279,26 @@ export default function Resources({
 
         {/* Right Action Icons */}
         <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Bookmark Navigation Icon */}
+          <button
+            onClick={onNavigateToBookmark}
+            className={`p-2 rounded-full border transition-colors cursor-pointer relative ${
+              isDarkMode
+                ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+            title="Saved Bookmarks"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            {bookmarkCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#0284c7] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {bookmarkCount}
+              </span>
+            )}
+          </button>
+
           {/* Theme Mode Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -242,7 +399,7 @@ export default function Resources({
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === "dashboard"
-                      ? "bg-[#e0f2fe] text-[#0284c7]  dark:text-sky-400"
+                      ? "bg-[#e0f2fe] text-[#0284c7] dark:bg-sky-950/60 dark:text-sky-400"
                       : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400"
                   }`}
                 >
@@ -326,6 +483,20 @@ export default function Resources({
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Options</p>
               <div className="space-y-1">
+                <button
+                  onClick={onNavigateToBookmark}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400 transition-all cursor-pointer"
+                >
+                  <svg className="w-4 h-4 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  <span>Saved Bookmarks</span>
+                  {bookmarkCount > 0 && (
+                    <span className="ml-auto bg-[#e0f2fe] text-[#0284c7] dark:bg-sky-950 dark:text-sky-300 px-1.5 py-0.5 rounded-md text-[10px] font-bold">
+                      {bookmarkCount}
+                    </span>
+                  )}
+                </button>
 
                 <button
                   onClick={onNavigateToFeedback}
@@ -482,41 +653,235 @@ export default function Resources({
 
           {/* ─── 4 Resources Cards Grid (Medium Card Size) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl">
-            {filteredResources.map((res) => (
-              <div
-                key={res.id}
-                onClick={() => handleResourceClick(res)}
-                className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer min-h-[130px] sm:min-h-[145px] ${
-                  isDarkMode
-                    ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
-                    : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
-                } ${
-                  selectedResource?.id === res.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
-                }`}
-              >
-                <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
-                  {res.icon}
-                </div>
+            {filteredResources.map((res) => {
+              const isSyllabusCard = res.id === "syllabus";
 
-                <h2
-                  className={`text-base font-bold tracking-tight transition-colors ${
+              return (
+                <div
+                  key={res.id}
+                  onClick={() => handleResourceClick(res)}
+                  className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-between text-center cursor-pointer min-h-[175px] sm:min-h-[190px] ${
                     isDarkMode
-                      ? "text-white group-hover:text-[#38bdf8]"
-                      : "text-slate-800 group-hover:text-[#0284c7]"
+                      ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
+                      : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
+                  } ${
+                    selectedResource?.id === res.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
                   }`}
                 >
-                  {res.name}
-                </h2>
+                  <div className="flex flex-col items-center w-full">
+                    <div className="w-12 h-12 rounded-xl bg-sky-50 dark:bg-sky-950/70 border border-sky-100 dark:border-sky-900/40 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
+                      {res.icon}
+                    </div>
 
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 line-clamp-1">
-                  {res.subtitle}
-                </p>
-              </div>
-            ))}
+                    <h2
+                      className={`text-base font-bold tracking-tight transition-colors ${
+                        isDarkMode
+                          ? "text-white group-hover:text-[#38bdf8]"
+                          : "text-slate-800 group-hover:text-[#0284c7]"
+                      }`}
+                    >
+                      {res.name}
+                    </h2>
+
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 line-clamp-1">
+                      {res.subtitle}
+                    </p>
+                  </div>
+
+                  {/* Action Section on the Card */}
+                  <div className="mt-4 w-full flex items-center justify-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                    {isSyllabusCard ? (
+                      <div className="flex items-center justify-center gap-2 w-full">
+                        {/* Primary View PDF Button on Syllabus Card */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenSyllabusPdf();
+                          }}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer hover:scale-105"
+                          title="View Official Syllabus PDF"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span>View PDF</span>
+                        </button>
+
+                        {/* Download Syllabus PDF Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSyllabusPdf();
+                          }}
+                          className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-[#0284c7] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Download Syllabus PDF"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0284c7] group-hover:underline">
+                        {res.actionText}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </main>
       </div>
+
+      {/* ─── Official Syllabus Details & ImageKit PDF Modal ─── */}
+      {showSyllabusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className={`w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-3xl p-6 sm:p-8 shadow-2xl border ${
+              isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
+                    Official Syllabus
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {subject.code || "Course"}
+                  </span>
+                </div>
+                <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                  {subject.name || "Subject Syllabus"}
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {university.code} • {course.code} • {branch.code} • {semester.name}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowSyllabusModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+              {/* PDF Document Preview Card */}
+              <div className="p-4 rounded-2xl border border-sky-100 dark:border-sky-900/50 bg-[#e0f2fe]/40 dark:bg-sky-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284c7] shrink-0 shadow-xs">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white">
+                      {subject.code || "BT-101"} Official Curriculum PDF
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      RGPV Approved Scheme & Syllabus • ImageKit CDN High-Speed Access
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* View PDF Button in Modal */}
+                  <button
+                    onClick={handleOpenSyllabusPdf}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer hover:scale-105"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <span>View PDF</span>
+                  </button>
+
+                  {/* Download PDF Button in Modal */}
+                  <button
+                    onClick={handleDownloadSyllabusPdf}
+                    className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Download Syllabus PDF"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* 5 Units Curriculum Breakdown */}
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Syllabus Units Breakdown (5 Units)
+                </p>
+
+                <div className="space-y-3">
+                  {currentUnits.map((u) => (
+                    <div
+                      key={u.id}
+                      className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-[#0284c7] dark:text-sky-300">
+                          {u.number}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {u.name}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pl-1">
+                        {u.topics}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={handleToggleSyllabusBookmark}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  syllabusIsBookmarked
+                    ? "bg-[#e0f2fe] text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300"
+                    : "text-slate-500 hover:text-[#0284c7] hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <svg className="w-4 h-4" fill={syllabusIsBookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>{syllabusIsBookmarked ? "Bookmarked in Vault" : "Bookmark Syllabus"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowSyllabusModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Toast Notification ─── */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold animate-bounce">
+          <svg className="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
-
