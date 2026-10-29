@@ -78,12 +78,17 @@ export const recordMaterialDownload = async (id) => {
   return response.data;
 };
 
-export const uploadMaterial = async (formData) => {
-  const response = await api.post("/materials/upload", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+export const uploadMaterial = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const headers = isFormData
+    ? { "Content-Type": "multipart/form-data" }
+    : { "Content-Type": "application/json" };
+  const response = await api.post("/materials/upload", data, { headers });
+  return response.data;
+};
+
+export const saveMaterialUrl = async (payload) => {
+  const response = await api.post("/materials/save-url", payload);
   return response.data;
 };
 

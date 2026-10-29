@@ -3,6 +3,7 @@ import {
   getMaterials,
   getMaterialById,
   uploadMaterial,
+  saveMaterialUrl,
   incrementView,
   incrementDownload,
   deleteMaterial,
@@ -17,6 +18,9 @@ router.get("/", getMaterials);
 router.get("/:id", getMaterialById);
 router.post("/:id/view", incrementView);
 router.post("/:id/download", incrementDownload);
+
+// Save direct ImageKit URL endpoint (Clean JSON, no multipart needed)
+router.post("/save-url", optionalAuth, saveMaterialUrl);
 
 // Upload routes (with Multer memory storage and ImageKit integration)
 router.post("/upload", optionalAuth, upload.single("file"), uploadMaterial);

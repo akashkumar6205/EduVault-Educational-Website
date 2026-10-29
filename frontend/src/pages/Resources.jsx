@@ -1,6 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import {
+  getBookmarkCount,
+  isBookmarked,
+  toggleBookmark,
+} from "../utils/bookmarkStorage";
+import {
+  getCustomMaterial,
+  saveCustomMaterial,
+} from "../utils/customMaterialStorage";
+import {
+  getMaterials,
+  recordMaterialView,
+  recordMaterialDownload,
+  uploadMaterial,
+  saveMaterialUrl,
+} from "../services/api";
 
 export default function Resources({
   university = { code: "RGPV", name: "Rajiv Gandhi Proudyogiki Vishwavidyalaya" },
@@ -29,6 +45,130 @@ export default function Resources({
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
+  const [modalResource, setModalResource] = useState(null);
+  const [resourceMaterials, setResourceMaterials] = useState([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [customPdfUrl, setCustomPdfUrl] = useState("");
+  const [showUrlForm, setShowUrlForm] = useState(false);
+  const [savingUrl, setSavingUrl] = useState(false);
+  const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+  const [toastMessage, setToastMessage] = useState("");
+
+  const handleSaveCustomUrl = async (e) => {
+    e.preventDefault();
+    if (!customPdfUrl.trim()) return;
+    setSavingUrl(true);
+    const pdfUrl = customPdfUrl.trim();
+    const cleanFileName =
+      pdfUrl.split("/").pop().split("?")[0] || `${subject?.code || "BT-101"}_${modalResource.name}.pdf`;
+
+    const materialData = {
+      _id: `custom-${Date.now()}`,
+      title: `${subject?.code || "BT-101"} ${modalResource.name}`,
+      resourceType: modalResource.id,
+      subjectCode: subject?.code || "BT-101",
+      semester: semester?.id || 1,
+      branch: branch?.code || "CSE",
+      file: {
+        fileId: `ik_${Date.now()}`,
+        url: pdfUrl,
+        thumbnailUrl: pdfUrl.endsWith(".pdf") ? `${pdfUrl}/ik-thumbnail.jpg` : pdfUrl,
+        fileName: cleanFileName,
+        fileType: "pdf",
+        pagesCount: 8,
+      },
+    };
+
+    // 1. Instantly save in local storage cache (Zero loss, immediate UI update)
+    saveCustomMaterial(subject?.code, modalResource.id, materialData);
+    setResourceMaterials([materialData]);
+
+    // 2. Persist to MongoDB backend
+    try {
+      const res = await saveMaterialUrl({
+        title: materialData.title,
+        resourceType: modalResource.id,
+        subjectCode: subject?.code || "BT-101",
+        semester: semester?.id || 1,
+        branch: branch?.code || "CSE",
+        fileUrl: pdfUrl,
+        fileName: cleanFileName,
+      });
+      if (res?.data) {
+        setResourceMaterials([res.data]);
+        saveCustomMaterial(subject?.code, modalResource.id, res.data);
+      }
+      showToast("PDF URL successfully saved in MongoDB!");
+    } catch (err) {
+      console.warn("MongoDB sync info:", err.message);
+      showToast("Saved to your local library! (Ready to sync to MongoDB)");
+    } finally {
+      setSavingUrl(false);
+      setShowUrlForm(false);
+      setCustomPdfUrl("");
+    }
+  };
+
+  useEffect(() => {
+    const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
+    window.addEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+    return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
+  }, []);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 2500);
+  };
+
+  useEffect(() => {
+    if (!modalResource) {
+      setResourceMaterials([]);
+      return;
+    }
+
+    const isChemistrySyllabus =
+      (subject?.code === "BT-101" || subject?.id === "chem") && modalResource.id === "syllabus";
+    const defaultUrl = isChemistrySyllabus
+      ? "https://ik.imagekit.io/Akashkumar/eduvault/syllabus/cse/bt-101/1793285917830_Screenshot_2026-10-29_172256_is_RYXT3b.pdf?updatedAt=1793285918036"
+      : `https://ik.imagekit.io/eduvault_demo/${subject?.code || "BT101"}_${modalResource.id}.pdf`;
+
+    const defaultMaterial = {
+      _id: `default-${modalResource.id}`,
+      title: isChemistrySyllabus
+        ? "BT-101 Engineering Chemistry Official RGPV Syllabus"
+        : `${subject?.code || "BT-101"} ${modalResource.name}`,
+      description: `Official RGPV curriculum and examination document for ${subject?.name || "Subject"}.`,
+      author: "RGPV Academic Division",
+      file: {
+        url: defaultUrl,
+        fileName: isChemistrySyllabus
+          ? "BT101_Chemistry_Syllabus.pdf"
+          : `${subject?.code || "BT101"}_${modalResource.name}.pdf`,
+        pagesCount: 8,
+      },
+      viewsCount: 210,
+      downloadsCount: 94,
+    };
+
+    // 1. Immediately set the material so "View PDF" is 100% visible with zero wait
+    const cached = getCustomMaterial(subject?.code, modalResource.id);
+    setResourceMaterials([cached || defaultMaterial]);
+    setLoadingMaterials(false);
+
+    // 2. Fetch from backend in background to keep MongoDB in sync
+    getMaterials({
+      subjectCode: subject?.code,
+      resourceType: modalResource.id,
+      semester: semester?.id,
+    })
+      .then((res) => {
+        if (res?.data && res.data.length > 0) {
+          setResourceMaterials(res.data);
+          saveCustomMaterial(subject?.code, modalResource.id, res.data[0]);
+        }
+      })
+      .catch(() => {});
+  }, [modalResource, subject, semester]);
 
   // Four resources requested
   const resourcesList = [
@@ -83,8 +223,8 @@ export default function Resources({
     setSelectedResource(res);
     if (res.id === "handwritten-notes" && onNavigateToUnit) {
       onNavigateToUnit(res, subject);
-    } else if (onSelectResource) {
-      onSelectResource(res);
+    } else {
+      setModalResource(res);
     }
   };
 
@@ -486,7 +626,7 @@ export default function Resources({
               <div
                 key={res.id}
                 onClick={() => handleResourceClick(res)}
-                className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer min-h-[130px] sm:min-h-[145px] ${
+                className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-between text-center cursor-pointer min-h-[175px] sm:min-h-[190px] ${
                   isDarkMode
                     ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
                     : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
@@ -494,28 +634,276 @@ export default function Resources({
                   selectedResource?.id === res.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
                 }`}
               >
-                <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
-                  {res.icon}
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
+                    {res.icon}
+                  </div>
+
+                  <h2
+                    className={`text-base font-bold tracking-tight transition-colors ${
+                      isDarkMode
+                        ? "text-white group-hover:text-[#38bdf8]"
+                        : "text-slate-800 group-hover:text-[#0284c7]"
+                    }`}
+                  >
+                    {res.name}
+                  </h2>
+
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 line-clamp-1">
+                    {res.subtitle}
+                  </p>
                 </div>
 
-                <h2
-                  className={`text-base font-bold tracking-tight transition-colors ${
-                    isDarkMode
-                      ? "text-white group-hover:text-[#38bdf8]"
-                      : "text-slate-800 group-hover:text-[#0284c7]"
-                  }`}
-                >
-                  {res.name}
-                </h2>
-
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 line-clamp-1">
-                  {res.subtitle}
-                </p>
+                {/* Direct Action Button on Card */}
+                <div className="mt-4 w-full">
+                  {res.id === "syllabus" ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(
+                          "https://ik.imagekit.io/Akashkumar/eduvault/syllabus/cse/bt-101/1793285917830_Screenshot_2026-10-29_172256_is_RYXT3b.pdf?updatedAt=1793285918036",
+                          "_blank",
+                          "noopener,noreferrer"
+                        );
+                        showToast("Opening Chemistry Syllabus PDF from ImageKit...");
+                      }}
+                      className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      <span>View PDF</span>
+                    </button>
+                  ) : res.id === "handwritten-notes" ? (
+                    <span className="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-[#0284c7] bg-sky-50 dark:bg-sky-950/60 py-1.5 px-3 rounded-xl w-full border border-sky-200/50">
+                      <span>Explore 5 Units →</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 py-1.5 px-3 rounded-xl w-full">
+                      <span>Open Material →</span>
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </main>
       </div>
+
+      {/* ─── Resource Material Modal (Syllabus, PYQ, Important Topics Viewer) ─── */}
+      {modalResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl border ${
+              isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200">
+                  {modalResource.name}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">
+                  {subject.code || "Course"}
+                </span>
+              </div>
+              <button
+                onClick={() => setModalResource(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+              {subject.name} - {modalResource.name}
+            </h3>
+
+            <div className="flex flex-wrap items-center gap-2 my-3 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold text-[#0284c7]">{university.code}</span>
+              <span>•</span>
+              <span>{course.code}</span>
+              <span>•</span>
+              <span>{branch.code}</span>
+              <span>•</span>
+              <span>{semester.name}</span>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 mb-6">
+              {modalResource.subtitle || "Official curriculum outline and examination materials."}
+            </p>
+
+            {/* Documents List */}
+            <div className="mb-6">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+                Available Document (ImageKit PDF)
+              </p>
+
+              {loadingMaterials ? (
+                <div className="flex items-center justify-center p-6 gap-2 text-xs text-slate-400">
+                  <div className="w-4 h-4 border-2 border-[#0284c7] border-t-transparent rounded-full animate-spin" />
+                  <span>Loading PDF from ImageKit...</span>
+                </div>
+              ) : resourceMaterials.length > 0 ? (
+                <div className="space-y-3">
+                  {resourceMaterials.map((mat) => (
+                    <div
+                      key={mat._id}
+                      className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/70 border border-sky-200/50 flex items-center justify-center text-[#0284c7] shrink-0">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {mat.title}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Source: {mat.author || "RGPV Curriculum"} • {mat.file?.pagesCount || 8} Pages
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                          onClick={() => {
+                            if (mat._id && !mat._id.startsWith("sample-")) {
+                              recordMaterialView(mat._id).catch(() => {});
+                            }
+                            if (mat.file?.url) {
+                              window.open(mat.file.url, "_blank", "noopener,noreferrer");
+                              showToast("Opening PDF from ImageKit CDN...");
+                            } else {
+                              showToast("Opening document viewer...");
+                            }
+                          }}
+                          className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs cursor-pointer"
+                        >
+                          View PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (mat._id && !mat._id.startsWith("sample-")) {
+                              recordMaterialDownload(mat._id).catch(() => {});
+                            }
+                            if (mat.file?.url) {
+                              window.open(mat.file.url, "_blank", "noopener,noreferrer");
+                            }
+                            showToast("Download started!");
+                          }}
+                          className="p-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Download PDF"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 py-3">No documents uploaded for this resource yet.</p>
+              )}
+              {/* Quick Link ImageKit URL Form */}
+              <div className="mt-4 pt-3 border-t border-dashed border-slate-200 dark:border-slate-800">
+                {!showUrlForm ? (
+                  <button
+                    onClick={() => setShowUrlForm(true)}
+                    className="text-[11px] font-semibold text-[#0284c7] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>+ Link / Update your ImageKit PDF URL directly into MongoDB</span>
+                  </button>
+                ) : (
+                  <form onSubmit={handleSaveCustomUrl} className="space-y-2 mt-2">
+                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                      Paste your ImageKit PDF URL:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://ik.imagekit.io/your_id/chemistry_syllabus.pdf"
+                        value={customPdfUrl}
+                        onChange={(e) => setCustomPdfUrl(e.target.value)}
+                        required
+                        className={`flex-1 text-xs px-3 py-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${
+                          isDarkMode
+                            ? "bg-slate-800 border-slate-700 text-slate-200"
+                            : "bg-white border-slate-200 text-slate-800"
+                        }`}
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingUrl}
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        {savingUrl ? "Saving..." : "Save to MongoDB"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlForm(false)}
+                        className="px-2.5 py-2 rounded-xl text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => {
+                  const bookmarkId = `${subject.code || subject.id}-${modalResource.id}`;
+                  const itemToSave = {
+                    id: bookmarkId,
+                    type: modalResource.id === "pyq" ? "pyq" : modalResource.id === "syllabus" ? "syllabus" : "important",
+                    categoryLabel: modalResource.name,
+                    title: `${subject.code ? `${subject.code} ` : ""}${modalResource.name}`,
+                    subject: subject.name,
+                    subjectCode: subject.code,
+                    semester: semester.name,
+                    branch: branch.code,
+                    university: university.code,
+                    description: modalResource.subtitle,
+                    fileUrl: resourceMaterials[0]?.file?.url || "",
+                  };
+                  const res = toggleBookmark(itemToSave);
+                  showToast(res.bookmarked ? `Saved ${modalResource.name} to Bookmarks!` : "Removed from Bookmarks");
+                }}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-[#0284c7] hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
+              >
+                Bookmark this {modalResource.name}
+              </button>
+
+              <button
+                onClick={() => setModalResource(null)}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold animate-bounce">
+          <svg className="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

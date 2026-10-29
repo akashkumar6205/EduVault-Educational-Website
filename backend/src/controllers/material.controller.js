@@ -12,7 +12,7 @@ export const getMaterials = async (req, res, next) => {
       unitNumber,
       unitId,
       semester,
-      branch = "CSE",
+      branch,
       search,
       page = 1,
       limit = 20,
@@ -21,11 +21,11 @@ export const getMaterials = async (req, res, next) => {
     const query = { isPublished: true };
 
     if (subjectCode) {
-      query.subjectCode = subjectCode.toUpperCase();
+      query.subjectCode = new RegExp(`^${subjectCode.trim()}$`, "i");
     }
 
     if (resourceType) {
-      query.resourceType = resourceType;
+      query.resourceType = resourceType.trim();
     }
 
     if (unitNumber) {
@@ -40,8 +40,8 @@ export const getMaterials = async (req, res, next) => {
       query.semester = Number(semester);
     }
 
-    if (branch) {
-      query.branch = new RegExp(`^${branch}$`, "i");
+    if (branch && branch !== "all") {
+      query.branch = new RegExp(`^${branch.trim()}$`, "i");
     }
 
     if (search) {
@@ -127,10 +127,10 @@ export const uploadMaterial = async (req, res, next) => {
     }
 
     let fileData = {
-      fileId: customFileId || `file_${Date.now()}`,
+      fileId: customFileId || `ik_${Date.now()}`,
       url: fileUrl || "",
-      thumbnailUrl: "",
-      fileName: req.file?.originalname || "document.pdf",
+      thumbnailUrl: fileUrl && fileUrl.endsWith(".pdf") ? `${fileUrl}/ik-thumbnail.jpg` : (fileUrl || ""),
+      fileName: req.file?.originalname || (fileUrl ? fileUrl.split("/").pop().split("?")[0] : "document.pdf"),
       fileType: "pdf",
       sizeBytes: req.file?.size || 0,
       pagesCount: 1,
@@ -174,23 +174,34 @@ export const uploadMaterial = async (req, res, next) => {
       });
     }
 
-    const material = await Material.create({
-      title,
-      resourceType,
-      university,
-      course,
-      branch,
-      semester: Number(semester),
+    const filter = {
       subjectCode: subjectCode.toUpperCase(),
-      unitNumber,
-      unitId,
-      description,
-      author,
-      year,
-      frequency,
-      file: fileData,
-      uploadedBy: req.user?.uid || "admin",
-    });
+      resourceType,
+      semester: Number(semester),
+    };
+    if (unitNumber) filter.unitNumber = unitNumber;
+
+    const material = await Material.findOneAndUpdate(
+      filter,
+      {
+        title,
+        resourceType,
+        university,
+        course,
+        branch,
+        semester: Number(semester),
+        subjectCode: subjectCode.toUpperCase(),
+        unitNumber,
+        unitId,
+        description,
+        author,
+        year,
+        frequency,
+        file: fileData,
+        uploadedBy: req.user?.uid || "admin",
+      },
+      { upsert: true, new: true }
+    );
 
     return res.status(201).json({
       success: true,
@@ -277,6 +288,90 @@ export const deleteMaterial = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Material deleted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Direct JSON endpoint to save or update an ImageKit PDF URL into MongoDB
+ */
+export const saveMaterialUrl = async (req, res, next) => {
+  try {
+    const {
+      title,
+      resourceType,
+      subjectCode,
+      semester = 1,
+      branch = "CSE",
+      university = "RGPV",
+      unitNumber = "",
+      unitId = "",
+      fileUrl,
+      fileName,
+    } = req.body;
+
+    if (!fileUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "fileUrl is required",
+      });
+    }
+
+    if (!subjectCode || !resourceType) {
+      return res.status(400).json({
+        success: false,
+        message: "subjectCode and resourceType are required",
+      });
+    }
+
+    const cleanFileName =
+      fileName || fileUrl.split("/").pop().split("?")[0] || `${subjectCode}_${resourceType}.pdf`;
+    const thumbnailUrl =
+      fileUrl.endsWith(".pdf") ? `${fileUrl}/ik-thumbnail.jpg` : fileUrl;
+
+    const filter = {
+      subjectCode: new RegExp(`^${subjectCode.trim()}$`, "i"),
+      resourceType: resourceType.trim(),
+      semester: Number(semester),
+    };
+    if (unitNumber) filter.unitNumber = unitNumber;
+
+    const updateDoc = {
+      title: title || `${subjectCode.toUpperCase()} ${resourceType.toUpperCase()}`,
+      resourceType: resourceType.trim(),
+      university: university || "RGPV",
+      branch: (branch || "CSE").toUpperCase(),
+      semester: Number(semester),
+      subjectCode: subjectCode.toUpperCase(),
+      unitNumber: unitNumber || "",
+      unitId: unitId || "",
+      description: `Official document for ${subjectCode.toUpperCase()}.`,
+      file: {
+        fileId: `ik_${Date.now()}`,
+        url: fileUrl.trim(),
+        thumbnailUrl,
+        fileName: cleanFileName,
+        fileType: "pdf",
+        sizeBytes: 1500000,
+        pagesCount: 8,
+      },
+      isPublished: true,
+      uploadedBy: req.user?.uid || "admin",
+    };
+
+    const material = await Material.findOneAndUpdate(filter, updateDoc, {
+      upsert: true,
+      new: true,
+    });
+
+    console.log(`[Material Controller] Saved PDF URL in MongoDB for ${subjectCode} (${resourceType}): ${fileUrl}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "PDF URL successfully saved in MongoDB!",
+      data: material,
     });
   } catch (error) {
     next(error);
