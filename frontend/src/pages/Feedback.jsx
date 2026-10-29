@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { getBookmarkCount } from "../utils/bookmarkStorage";
+import { submitServerFeedback } from "../services/api";
 
 export default function Feedback({
   onNavigateToDashboard,
@@ -74,7 +75,7 @@ export default function Feedback({
     }
 
     try {
-      // Optional: Store review in local storage
+      // Store review in local storage
       const feedbackRecord = {
         userId: user.uid,
         userName: displayName,
@@ -85,8 +86,13 @@ export default function Feedback({
       };
       const existingReviews = JSON.parse(localStorage.getItem("eduvault_feedbacks") || "[]");
       localStorage.setItem("eduvault_feedbacks", JSON.stringify([...existingReviews, feedbackRecord]));
+
+      // Save to MongoDB backend
+      submitServerFeedback(feedbackRecord).catch((serverErr) => {
+        console.warn("[Backend Warning] Could not persist feedback to server:", serverErr.message);
+      });
     } catch (storageErr) {
-      console.warn("Could not save feedback to localStorage:", storageErr);
+      console.warn("Could not save feedback:", storageErr);
     }
 
     setErrorMsg("");

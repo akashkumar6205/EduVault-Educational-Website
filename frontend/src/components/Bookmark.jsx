@@ -929,7 +929,12 @@ export default function Bookmark({
               </button>
               <button
                 onClick={() => {
-                  showToast("Opening study viewer...");
+                  if (selectedItem.fileUrl) {
+                    window.open(selectedItem.fileUrl, "_blank", "noopener,noreferrer");
+                    showToast("Opening document from ImageKit...");
+                  } else {
+                    showToast("Opening study viewer...");
+                  }
                   setSelectedItem(null);
                 }}
                 className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-md cursor-pointer"
