@@ -61,9 +61,8 @@ export default function Courses({
   return (
     <div className={`min-h-screen ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
       {/* ─── Top Navbar ─── */}
-      <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${
-        isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
-      }`}>
+      <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+        }`}>
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-3">
           <button
@@ -89,11 +88,10 @@ export default function Courses({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search courses, branches, or subjects..."
-              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${
-                isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
-                  : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
-              }`}
+              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${isDarkMode
+                ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
+                : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
+                }`}
             />
             {searchQuery && (
               <button
@@ -111,11 +109,10 @@ export default function Courses({
           {/* Theme Mode Toggle Button */}
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-full border transition-colors ${
-              isDarkMode
-                ? "border-slate-700 text-amber-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-            }`}
+            className={`p-2 rounded-full border transition-colors ${isDarkMode
+              ? "border-slate-700 text-amber-300 hover:bg-slate-800"
+              : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              }`}
             title="Toggle Theme"
           >
             {isDarkMode ? (
@@ -151,9 +148,8 @@ export default function Courses({
 
             {/* Profile Dropdown */}
             {showProfileMenu && (
-              <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${
-                isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
-              }`}>
+              <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
+                }`}>
                 <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                   <p className="text-xs font-semibold truncate">{user?.displayName || "Guest User"}</p>
                   <p className="text-[11px] text-slate-400 truncate">{user?.email || "guest@eduvault.io"}</p>
@@ -194,9 +190,8 @@ export default function Courses({
       {/* ─── Body Layout: Left Sidebar + Main Content ─── */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
-        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 transition-colors ${
-          isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
-        }`}>
+        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 transition-colors ${isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
+          }`}>
           <div className="space-y-1.5">
             {/* Dashboard (Active) */}
             <button
@@ -339,32 +334,28 @@ export default function Courses({
                     }
                   }
                 }}
-                className={`relative rounded-2xl p-6 sm:p-7 border transition-all duration-300 flex flex-col justify-between ${
-                  isDarkMode
-                    ? "bg-slate-900 border-slate-800"
-                    : "bg-white border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
-                } ${
-                  c.isAvailable
+                className={`relative rounded-2xl p-6 sm:p-7 border transition-all duration-300 flex flex-col justify-between ${isDarkMode
+                  ? "bg-slate-900 border-slate-800"
+                  : "bg-white border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]"
+                  } ${c.isAvailable
                     ? "hover:shadow-xl hover:border-[#0284c7]/50 hover:-translate-y-1 cursor-pointer ring-1 ring-[#0284c7]/20"
                     : "opacity-80 cursor-not-allowed"
-                } ${
-                  selectedCourse === c.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
-                }`}
+                  } ${selectedCourse === c.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
+                  }`}
                 style={{ minHeight: "260px" }}
               >
                 {/* Top header row */}
                 <div>
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex items-center gap-3.5">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                        c.isAvailable
-                          ? "bg-[#e0f2fe] border border-sky-200"
-                          : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                      }`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${c.isAvailable
+                        ? "bg-[#e0f2fe] border border-sky-200"
+                        : "bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                        }`}>
                         {c.icon}
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold tracking-wider uppercase text-[#0284c7] bg-sky-50 dark:bg-sky-950/50 px-2.5 py-0.5 rounded-full border border-sky-100 dark:border-sky-900/40">
+                        <span className="text-[11px] font-bold tracking-wider uppercase text-[#0284c7] bg-sky-50  px-2.5 py-0.5 rounded-full border border-sky-100 dark:border-sky-900/40">
                           {c.duration}
                         </span>
                         <h2 className={`text-xl font-bold tracking-tight mt-1 ${isDarkMode ? "text-white" : "text-slate-900"}`}>
@@ -384,7 +375,7 @@ export default function Courses({
                         </svg>
                       </div>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-500/20 shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-500/20 shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         Active Course
                       </span>
