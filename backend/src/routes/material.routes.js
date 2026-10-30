@@ -18,8 +18,8 @@ router.get("/:id", getMaterialById);
 router.post("/:id/view", incrementView);
 router.post("/:id/download", incrementDownload);
 
-// Upload routes (with Multer memory storage and ImageKit integration)
-router.post("/upload", optionalAuth, upload.single("file"), uploadMaterial);
+// Upload routes (accept any file key e.g. file, image, syllabus, etc.)
+router.post("/upload", optionalAuth, upload.any(), uploadMaterial);
 router.delete("/:id", requireAuth, deleteMaterial);
 
 export default router;

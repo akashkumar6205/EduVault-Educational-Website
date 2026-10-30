@@ -177,6 +177,24 @@ export const seedDatabase = async () => {
     if (sampleMaterialCount === 0) {
       const sampleMaterials = [
         {
+          title: "Engineering Chemistry: Official RGPV Syllabus",
+          resourceType: "syllabus",
+          subjectCode: "BT-101",
+          semester: 1,
+          branch: "CSE",
+          description: "Official RGPV curriculum outline and marking scheme for Engineering Chemistry.",
+          author: "RGPV Academic Council",
+          file: {
+            fileId: "sample_bt101_syllabus",
+            url: "https://ik.imagekit.io/eduvault_demo/syllabus/BT101_Syllabus.pdf",
+            thumbnailUrl: "https://ik.imagekit.io/eduvault_demo/syllabus/BT101_Syllabus.pdf/ik-thumbnail.jpg",
+            fileName: "BT101_Official_Syllabus.pdf",
+            fileType: "pdf",
+            sizeBytes: 950000,
+            pagesCount: 4,
+          },
+        },
+        {
           title: "Engineering Chemistry: Water Analysis & Treatment Hand-Written Notes",
           resourceType: "handwritten-notes",
           subjectCode: "BT-101",

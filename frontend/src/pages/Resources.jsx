@@ -44,6 +44,16 @@ export default function Resources({
   const [showSyllabusModal, setShowSyllabusModal] = useState(false);
   const [syllabusMaterial, setSyllabusMaterial] = useState(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState(false);
+
+  // Modals and data for other resource types (PYQ, Unit-Wise Important)
+  const [showPyqModal, setShowPyqModal] = useState(false);
+  const [pyqMaterials, setPyqMaterials] = useState([]);
+  const [loadingPyq, setLoadingPyq] = useState(false);
+
+  const [showImportantModal, setShowImportantModal] = useState(false);
+  const [importantMaterials, setImportantMaterials] = useState([]);
+  const [loadingImportant, setLoadingImportant] = useState(false);
+
   const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
   const [toastMessage, setToastMessage] = useState("");
 
@@ -61,8 +71,8 @@ export default function Resources({
     return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
   }, [syllabusBookmarkId]);
 
-  // Fetch syllabus material if uploaded to backend
-  useEffect(() => {
+  // Fetch syllabus material from MongoDB
+  const fetchSyllabus = () => {
     if (!subject?.code) return;
     setLoadingSyllabus(true);
     getMaterials({
@@ -79,6 +89,7 @@ export default function Resources({
             file: {
               url: `https://ik.imagekit.io/eduvault_demo/syllabus/${subject.code.replace("-", "")}_Syllabus.pdf`,
               fileName: `${subject.code}_Official_Syllabus.pdf`,
+              fileType: "pdf",
               pagesCount: 4,
             },
             author: "RGPV Academic Council",
@@ -92,13 +103,56 @@ export default function Resources({
           file: {
             url: `https://ik.imagekit.io/eduvault_demo/syllabus/${subject.code.replace("-", "")}_Syllabus.pdf`,
             fileName: `${subject.code}_Official_Syllabus.pdf`,
+            fileType: "pdf",
             pagesCount: 4,
           },
           author: "RGPV Academic Council",
         });
       })
       .finally(() => setLoadingSyllabus(false));
-  }, [subject]);
+  };
+
+  // Fetch PYQ materials from MongoDB
+  const fetchPyqs = () => {
+    if (!subject?.code) return;
+    setLoadingPyq(true);
+    getMaterials({
+      subjectCode: subject.code,
+      resourceType: "pyq",
+    })
+      .then((res) => {
+        if (res?.data && res.data.length > 0) {
+          setPyqMaterials(res.data);
+        } else {
+          setPyqMaterials([]);
+        }
+      })
+      .catch(() => setPyqMaterials([]))
+      .finally(() => setLoadingPyq(false));
+  };
+
+  // Fetch Unit-Wise Important materials from MongoDB
+  const fetchImportant = () => {
+    if (!subject?.code) return;
+    setLoadingImportant(true);
+    getMaterials({
+      subjectCode: subject.code,
+      resourceType: "unit-wise-important",
+    })
+      .then((res) => {
+        if (res?.data && res.data.length > 0) {
+          setImportantMaterials(res.data);
+        } else {
+          setImportantMaterials([]);
+        }
+      })
+      .catch(() => setImportantMaterials([]))
+      .finally(() => setLoadingImportant(false));
+  };
+
+  useEffect(() => {
+    fetchSyllabus();
+  }, [subject?.code]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -207,10 +261,17 @@ export default function Resources({
 
   const handleResourceClick = (res) => {
     setSelectedResource(res);
-    if (res.id === "handwritten-notes" && onNavigateToUnit) {
-      onNavigateToUnit(res, subject);
+    if (res.id === "handwritten-notes") {
+      if (onNavigateToUnit) onNavigateToUnit(res, subject);
     } else if (res.id === "syllabus") {
+      fetchSyllabus();
       setShowSyllabusModal(true);
+    } else if (res.id === "pyq") {
+      fetchPyqs();
+      setShowPyqModal(true);
+    } else if (res.id === "unit-wise-important") {
+      fetchImportant();
+      setShowImportantModal(true);
     } else if (onSelectResource) {
       onSelectResource(res);
     }
@@ -735,7 +796,7 @@ export default function Resources({
         </main>
       </div>
 
-      {/* ─── Official Syllabus Details & ImageKit PDF Modal ─── */}
+      {/* ─── Official Syllabus Details & ImageKit PDF/Image Modal ─── */}
       {showSyllabusModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
           <div
@@ -753,9 +814,18 @@ export default function Resources({
                   <span className="text-xs font-semibold text-slate-400">
                     {subject.code || "Course"}
                   </span>
+                  {syllabusMaterial?._id && !syllabusMaterial._id.startsWith("syllabus-") ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      ✓ Stored in Database
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                      Sample Scheme
+                    </span>
+                  )}
                 </div>
                 <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                  {subject.name || "Subject Syllabus"}
+                  {syllabusMaterial?.title || subject.name || "Subject Syllabus"}
                 </h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   {university.code} • {course.code} • {branch.code} • {semester.name}
@@ -773,7 +843,35 @@ export default function Resources({
 
             {/* Modal Scrollable Body */}
             <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-              {/* PDF Document Preview Card */}
+              {/* Syllabus Image Preview (If file is an image) */}
+              {Boolean(
+                syllabusMaterial?.file?.url &&
+                  (syllabusMaterial.file.fileType === "image" ||
+                    /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(syllabusMaterial.file.url))
+              ) && (
+                <div className="p-3 rounded-2xl border border-sky-200 dark:border-sky-900 bg-sky-50/50 dark:bg-slate-950/50 flex flex-col items-center">
+                  <div className="flex items-center justify-between w-full px-1 mb-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Syllabus Image Preview
+                    </span>
+                    <a
+                      href={syllabusMaterial.file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[#0284c7] hover:underline font-semibold"
+                    >
+                      Open Full Image ↗
+                    </a>
+                  </div>
+                  <img
+                    src={syllabusMaterial.file.url}
+                    alt={syllabusMaterial.title || "Syllabus"}
+                    className="max-h-[340px] w-auto max-w-full rounded-xl object-contain shadow-xs border border-slate-200 dark:border-slate-800"
+                  />
+                </div>
+              )}
+
+              {/* Document Info Card */}
               <div className="p-4 rounded-2xl border border-sky-100 dark:border-sky-900/50 bg-[#e0f2fe]/40 dark:bg-sky-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284c7] shrink-0 shadow-xs">
@@ -783,16 +881,16 @@ export default function Resources({
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-white">
-                      {subject.code || "BT-101"} Official Curriculum PDF
+                      {syllabusMaterial?.title || `${subject.code || "BT-101"} Official Curriculum`}
                     </p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      RGPV Approved Scheme & Syllabus • ImageKit CDN High-Speed Access
+                      {syllabusMaterial?.description || "RGPV Approved Scheme & Syllabus • High-Speed Access"}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* View PDF Button in Modal */}
+                  {/* View Document Button in Modal */}
                   <button
                     onClick={handleOpenSyllabusPdf}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer hover:scale-105"
@@ -801,14 +899,14 @@ export default function Resources({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
-                    <span>View PDF</span>
+                    <span>View File</span>
                   </button>
 
-                  {/* Download PDF Button in Modal */}
+                  {/* Download Document Button in Modal */}
                   <button
                     onClick={handleDownloadSyllabusPdf}
                     className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Download Syllabus PDF"
+                    title="Download Syllabus"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -864,6 +962,232 @@ export default function Resources({
 
               <button
                 onClick={() => setShowSyllabusModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PYQ (Previous Year Questions) Modal ─── */}
+      {showPyqModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className={`w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-3xl p-6 sm:p-8 shadow-2xl border ${
+              isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                    Previous Year Question Papers
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {subject.code || "Course"}
+                  </span>
+                </div>
+                <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                  {subject.name || "Subject"} PYQs
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {university.code} • {course.code} • {branch.code} • {semester.name}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowPyqModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {loadingPyq ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="w-8 h-8 border-3 border-[#0284c7] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-slate-400">Fetching PYQs from Database...</p>
+                </div>
+              ) : pyqMaterials.length > 0 ? (
+                pyqMaterials.map((item) => (
+                  <div
+                    key={item._id}
+                    className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                          {item.year || "RGPV Exam"}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {item.title}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {item.description || "Official examination question paper."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (item.file?.url) {
+                            window.open(item.file.url, "_blank", "noopener,noreferrer");
+                            showToast("Opening PYQ Document...");
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>View PYQ</span>
+                      </button>
+                      {item.file?.url && (
+                        <a
+                          href={item.file.url}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                          title="Download"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 px-4">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-500 mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No PYQs in Database Yet</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    Upload a question paper via Postman using resourceType: <code className="text-[#0284c7]">"pyq"</code> for {subject.code}.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowPyqModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Unit Wise Important Topics Modal ─── */}
+      {showImportantModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className={`w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-3xl p-6 sm:p-8 shadow-2xl border ${
+              isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800">
+                    Important Topics
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {subject.code || "Course"}
+                  </span>
+                </div>
+                <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                  {subject.name || "Subject"} Unit-Wise Important Topics
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  {university.code} • {course.code} • {branch.code} • {semester.name}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowImportantModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {loadingImportant ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="w-8 h-8 border-3 border-[#0284c7] border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-slate-400">Fetching Important Topics from Database...</p>
+                </div>
+              ) : importantMaterials.length > 0 ? (
+                importantMaterials.map((item) => (
+                  <div
+                    key={item._id}
+                    className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-850/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                          {item.frequency || item.unitNumber || "High Priority"}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {item.title}
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {item.description || "Repeated examination questions and high-weightage topics."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (item.file?.url) {
+                            window.open(item.file.url, "_blank", "noopener,noreferrer");
+                            showToast("Opening Important Topics...");
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer"
+                      >
+                        <span>View Topics</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10 px-4">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-500 mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">No Important Topics in Database Yet</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    Upload topics via Postman using resourceType: <code className="text-[#0284c7]">"unit-wise-important"</code> for {subject.code}.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setShowImportantModal(false)}
                 className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 Close
