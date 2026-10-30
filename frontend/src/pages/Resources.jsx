@@ -41,7 +41,8 @@ export default function Resources({
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedResource, setSelectedResource] = useState(null);
-  const [showSyllabusModal, setShowSyllabusModal] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(true);
   const [syllabusMaterial, setSyllabusMaterial] = useState(null);
   const [loadingSyllabus, setLoadingSyllabus] = useState(false);
   const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
@@ -113,8 +114,8 @@ export default function Resources({
     if (syllabusMaterial?._id && !syllabusMaterial._id.startsWith("syllabus-")) {
       recordMaterialView(syllabusMaterial._id).catch(() => { });
     }
-    window.open(defaultSyllabusUrl, "_blank", "noopener,noreferrer");
-    showToast("Opening Official Syllabus PDF from ImageKit...");
+    setPdfLoading(true);
+    setShowPdfViewer(true);
   };
 
   const handleDownloadSyllabusPdf = () => {
@@ -210,20 +211,11 @@ export default function Resources({
     if (res.id === "handwritten-notes" && onNavigateToUnit) {
       onNavigateToUnit(res, subject);
     } else if (res.id === "syllabus") {
-      setShowSyllabusModal(true);
+      handleOpenSyllabusPdf();
     } else if (onSelectResource) {
       onSelectResource(res);
     }
   };
-
-  const subjectKey = subject?.code?.toUpperCase();
-  const currentUnits = rgpvUnitsMap[subjectKey] || [
-    { id: "u1", number: "UNIT I", name: "Fundamentals & Core Concepts", topics: "Basic definitions, Introduction, Mathematical foundations, Core theorems and architecture" },
-    { id: "u2", number: "UNIT II", name: "Methods & Algorithmic Analysis", topics: "Key algorithmic techniques, Methodologies, Mathematical formulations, Practical structures" },
-    { id: "u3", number: "UNIT III", name: "Intermediate Systems & Applications", topics: "Detailed system design, Standard methods, Real-world applications and structural models" },
-    { id: "u4", number: "UNIT IV", name: "Advanced Optimization & Design", topics: "Advanced design patterns, Performance optimization, Analytical frameworks and evaluation" },
-    { id: "u5", number: "UNIT V", name: "Emerging Technologies & Case Studies", topics: "Current industry trends, Case studies, Advanced implementations and standard practices" },
-  ];
 
   const displayName = user?.displayName || "Student User";
   const displayEmail = user?.email || "student@eduvault.io";
@@ -260,8 +252,8 @@ export default function Resources({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search resources (notes, pyq, syllabus)..."
               className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
-                  : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
+                ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
+                : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
                 }`}
             />
             {searchQuery && (
@@ -281,8 +273,8 @@ export default function Resources({
           <button
             onClick={onNavigateToBookmark}
             className={`p-2 rounded-full border transition-colors cursor-pointer relative ${isDarkMode
-                ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+              : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             title="Saved Bookmarks"
           >
@@ -300,8 +292,8 @@ export default function Resources({
           <button
             onClick={toggleTheme}
             className={`p-2 rounded-full border transition-colors cursor-pointer ${isDarkMode
-                ? "border-slate-700 text-amber-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              ? "border-slate-700 text-amber-300 hover:bg-slate-800"
+              : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
               }`}
             title="Toggle Theme"
           >
@@ -588,8 +580,8 @@ export default function Resources({
                   key={res.id}
                   onClick={() => handleResourceClick(res)}
                   className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-between text-center cursor-pointer min-h-[175px] sm:min-h-[190px] ${isDarkMode
-                      ? " border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
-                      : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
+                    ? " border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
+                    : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
                     } ${selectedResource?.id === res.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
                     }`}
                 >
@@ -600,8 +592,8 @@ export default function Resources({
 
                     <h2
                       className={`text-base font-bold tracking-tight transition-colors ${isDarkMode
-                          ? "text-white group-hover:text-[#38bdf8]"
-                          : "text-slate-800 group-hover:text-[#0284c7]"
+                        ? "text-white group-hover:text-[#38bdf8]"
+                        : "text-slate-800 group-hover:text-[#0284c7]"
                         }`}
                     >
                       {res.name}
@@ -659,137 +651,125 @@ export default function Resources({
         </main>
       </div>
 
-      {/* ─── Official Syllabus Details & ImageKit PDF Modal ─── */}
-      {showSyllabusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      {/* ─── In-App Official Syllabus PDF Viewer Modal with Loading Effect ─── */}
+      {showPdfViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/75 backdrop-blur-xs animate-fade-in">
           <div
-            className={`w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col rounded-3xl p-6 sm:p-8 shadow-2xl border ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+            className={`w-full max-w-5xl h-[92vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
               }`}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
-                    Official Syllabus
-                  </span>
-                  <span className="text-xs font-semibold text-slate-400">
-                    {subject.code || "Course"}
-                  </span>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/70 dark:bg-slate-900/70">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284c7] shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
                 </div>
-                <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                  {subject.name || "Subject Syllabus"}
-                </h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  {university.code} • {course.code} • {branch.code} • {semester.name}
-                </p>
+                <div className="truncate">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-[#0284c7] dark:text-sky-300">
+                      {subject.code || "PDF"}
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold truncate">
+                      {subject.name || "Official Syllabus"}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {university.code} • {course.code} • {branch.code} • {semester.name}
+                  </p>
+                </div>
               </div>
 
-              <button
-                onClick={() => setShowSyllabusModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Close"
-              >
-                ✕
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Bookmark Toggle */}
+                <button
+                  onClick={handleToggleSyllabusBookmark}
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${syllabusIsBookmarked
+                      ? "bg-[#e0f2fe] text-[#0284c7] border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  title={syllabusIsBookmarked ? "Remove Bookmark" : "Bookmark Syllabus"}
+                >
+                  <svg className="w-4 h-4" fill={syllabusIsBookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                </button>
+
+                {/* Open in New Tab */}
+                <button
+                  onClick={() => {
+                    window.open(defaultSyllabusUrl, "_blank", "noopener,noreferrer");
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Open in new window"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  <span>New Tab</span>
+                </button>
+
+                {/* Download PDF */}
+                <button
+                  onClick={handleDownloadSyllabusPdf}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs cursor-pointer"
+                  title="Download Syllabus PDF"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="hidden sm:inline">Download</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowPdfViewer(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+                  title="Close PDF Viewer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* Modal Scrollable Body */}
-            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-              {/* PDF Document Preview Card */}
-              <div className="p-4 rounded-2xl border border-sky-100 dark:border-sky-900/50 bg-[#e0f2fe]/40 dark:bg-sky-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284c7] shrink-0 shadow-xs">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">
-                      {subject.code || "BT-101"} Official Curriculum PDF
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      RGPV Approved Scheme & Syllabus • ImageKit CDN High-Speed Access
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* View PDF Button in Modal */}
-                  <button
-                    onClick={handleOpenSyllabusPdf}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs transition-all cursor-pointer hover:scale-105"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <span>View PDF</span>
-                  </button>
-
-                  {/* Download PDF Button in Modal */}
-                  <button
-                    onClick={handleDownloadSyllabusPdf}
-                    className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Download Syllabus PDF"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* 5 Units Curriculum Breakdown */}
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                  Syllabus Units Breakdown (5 Units)
-                </p>
-
-                <div className="space-y-3">
-                  {currentUnits.map((u) => (
-                    <div
-                      key={u.id}
-                      className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-[#0284c7] dark:text-sky-300">
-                          {u.number}
-                        </span>
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          {u.name}
-                        </h4>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pl-1">
-                        {u.topics}
-                      </p>
+            {/* Modal Body / PDF Frame Container */}
+            <div className="relative flex-1 w-full h-full bg-slate-100 dark:bg-slate-950 overflow-hidden">
+              {/* Loading State Effect */}
+              {pdfLoading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-xs transition-opacity duration-300">
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-[#0284c7]/20 border-t-[#0284c7] rounded-full animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 bg-[#0284c7] rounded-full animate-ping" />
                     </div>
-                  ))}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Loading Official Syllabus PDF...
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Fetching document securely from CDN
+                    </p>
+                  </div>
+                  {/* Subtle skeleton bar animation */}
+                  <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div className="w-full h-full bg-gradient-to-r from-transparent via-[#0284c7] to-transparent animate-pulse" />
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Modal Footer Actions */}
-            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
-              <button
-                onClick={handleToggleSyllabusBookmark}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${syllabusIsBookmarked
-                    ? "bg-[#e0f2fe] text-[#0284c7] dark:bg-sky-950/80 dark:text-sky-300"
-                    : "text-slate-500 hover:text-[#0284c7] hover:bg-slate-100 dark:hover:bg-slate-800"
+              {/* The Actual PDF Display */}
+              <iframe
+                src={`${defaultSyllabusUrl}#toolbar=1&navpanes=0`}
+                title={`${subject.code || "Subject"} Syllabus PDF`}
+                className={`w-full h-full border-0 transition-opacity duration-500 ${pdfLoading ? "opacity-0" : "opacity-100"
                   }`}
-              >
-                <svg className="w-4 h-4" fill={syllabusIsBookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <span>{syllabusIsBookmarked ? "Bookmarked in Vault" : "Bookmark Syllabus"}</span>
-              </button>
-
-              <button
-                onClick={() => setShowSyllabusModal(false)}
-                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
+                onLoad={() => {
+                  setTimeout(() => setPdfLoading(false), 500);
+                }}
+              />
             </div>
           </div>
         </div>
