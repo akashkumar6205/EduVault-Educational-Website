@@ -85,8 +85,9 @@ export function AuthProvider({ children }) {
         setError("Sign-in was cancelled (popup closed).");
         setSigningIn(false);
       } else if (err.code === "auth/unauthorized-domain") {
+        const currentHost = typeof window !== "undefined" ? window.location.hostname : "your current domain";
         setError(
-          "Current domain is not authorized in Firebase Console. Please add 'localhost' to Authorized Domains in Firebase Authentication Settings."
+          `Current domain '${currentHost}' is not authorized in Firebase Console. Please click 'Add domain' and add '${currentHost}' to Authorized Domains in Firebase Authentication Settings.`
         );
         setSigningIn(false);
       } else if (err.code === "auth/configuration-not-found") {
