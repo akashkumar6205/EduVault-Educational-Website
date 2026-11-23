@@ -11,6 +11,7 @@ import {
   recordMaterialView,
   recordMaterialDownload,
 } from "../services/api";
+import { downloadPdfFile } from "../utils/downloadHelper";
 import { rgpvUnitsMap } from "../utils/curriculumData";
 
 export default function Unit({
@@ -40,63 +41,13 @@ export default function Unit({
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [unitMaterials, setUnitMaterials] = useState([]);
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [activeUnit, setActiveUnit] = useState(null);
+  const [activeMaterial, setActiveMaterial] = useState(null);
+  const [activePdfUrl, setActivePdfUrl] = useState("");
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(true);
   const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
   const [toastMessage, setToastMessage] = useState("");
-
-  useEffect(() => {
-    if (!selectedUnit) {
-      setUnitMaterials([]);
-      return;
-    }
-    setLoadingMaterials(true);
-    getMaterials({
-      subjectCode: subject?.code,
-      unitNumber: selectedUnit.number,
-      resourceType: "handwritten-notes",
-    })
-      .then((res) => {
-        if (res?.data && res.data.length > 0) {
-          setUnitMaterials(res.data);
-        } else {
-          setUnitMaterials([
-            {
-              _id: `sample-${selectedUnit.id}`,
-              title: `${subject?.code || "Subject"} ${selectedUnit.number} Handwritten Notes`,
-              description: selectedUnit.topics,
-              author: "EduVault Contributor (RGPV Topper)",
-              file: {
-                url: `https://ik.imagekit.io/eduvault_demo/${subject?.code || "BT101"}_${selectedUnit.id}_notes.pdf`,
-                fileName: `${subject?.code || "BT101"}_${selectedUnit.number}_Notes.pdf`,
-                pagesCount: 20,
-              },
-              viewsCount: 142,
-              downloadsCount: 38,
-            },
-          ]);
-        }
-      })
-      .catch(() => {
-        setUnitMaterials([
-          {
-            _id: `sample-${selectedUnit.id}`,
-            title: `${subject?.code || "Subject"} ${selectedUnit.number} Handwritten Notes`,
-            description: selectedUnit.topics,
-            author: "EduVault Contributor (RGPV Topper)",
-            file: {
-              url: `https://ik.imagekit.io/eduvault_demo/${subject?.code || "BT101"}_${selectedUnit.id}_notes.pdf`,
-              fileName: `${subject?.code || "BT101"}_${selectedUnit.number}_Notes.pdf`,
-              pagesCount: 20,
-            },
-            viewsCount: 142,
-            downloadsCount: 38,
-          },
-        ]);
-      })
-      .finally(() => setLoadingMaterials(false));
-  }, [selectedUnit, subject]);
 
   useEffect(() => {
     const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
@@ -104,9 +55,91 @@ export default function Unit({
     return () => window.removeEventListener("eduvault_bookmarks_changed", handleBookmarkChange);
   }, []);
 
+  useEffect(() => {
+    if (showPdfViewer && pdfLoading) {
+      const timer = setTimeout(() => {
+        setPdfLoading(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showPdfViewer, pdfLoading]);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 2500);
+  };
+
+  const handleOpenUnitPdf = (unit) => {
+    setActiveUnit(unit);
+    const cleanSubjectCode = (subject?.code || "BT101").replace("-", "");
+    const defaultUrl = `https://ik.imagekit.io/eduvault_demo/${cleanSubjectCode}_${unit.id}_notes.pdf`;
+    setActivePdfUrl(defaultUrl);
+    setActiveMaterial(null);
+    setPdfLoading(true);
+    setShowPdfViewer(true);
+
+    if (onSelectUnit) {
+      onSelectUnit(unit);
+    }
+
+    getMaterials({
+      subjectCode: subject?.code,
+      unitNumber: unit.number,
+      resourceType: "handwritten-notes",
+    })
+      .then((res) => {
+        if (res?.data && res.data.length > 0) {
+          const mat = res.data[0];
+          setActiveMaterial(mat);
+          if (mat.file?.url) {
+            setActivePdfUrl(mat.file.url);
+          }
+          if (mat._id && !mat._id.startsWith("sample-")) {
+            recordMaterialView(mat._id).catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
+  };
+
+  const handleDownloadActiveUnitPdf = async () => {
+    if (!activeUnit) return;
+    const cleanSubjectCode = (subject?.code || "Subject").replace("-", "");
+    const fileName =
+      activeMaterial?.file?.fileName ||
+      `${cleanSubjectCode}_${activeUnit.number.replace(/\s+/g, "_")}_Notes.pdf`;
+    showToast(`Downloading ${fileName}...`);
+    if (activeMaterial?._id && !activeMaterial._id.startsWith("sample-")) {
+      recordMaterialDownload(activeMaterial._id).catch(() => {});
+    }
+    await downloadPdfFile(activePdfUrl, fileName);
+  };
+
+  const handleToggleActiveUnitBookmark = () => {
+    if (!activeUnit) return;
+    const bookmarkId = `${subject?.code || subject?.id || "BT101"}-${activeUnit.id}-notes`;
+    const itemToSave = {
+      id: bookmarkId,
+      type: "notes",
+      categoryLabel: "Handwritten Notes",
+      title: `${subject?.code ? `${subject.code} ` : ""}${activeUnit.number}: ${activeUnit.name}`,
+      subject: subject?.name || "",
+      subjectCode: subject?.code || "",
+      semester: semester?.name || "",
+      branch: branch?.code || "",
+      university: university?.code || "",
+      unit: activeUnit.number,
+      description: activeUnit.topics,
+      fileUrl: activePdfUrl,
+      date: "Saved",
+    };
+    const result = toggleBookmark(itemToSave);
+    setBookmarkCount(getBookmarkCount());
+    showToast(
+      result.bookmarked
+        ? `Saved "${activeUnit.number} Notes" to Bookmarks!`
+        : `Removed "${activeUnit.number} Notes" from Bookmarks`
+    );
   };
 
   // Resolve units for currently selected subject code or fallback
@@ -125,23 +158,15 @@ export default function Unit({
     u.topics.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleUnitClick = (unit) => {
-    setSelectedUnit(unit);
-    if (onSelectUnit) {
-      onSelectUnit(unit);
-    }
-  };
-
   const displayName = user?.displayName || "Student User";
   const displayEmail = user?.email || "student@eduvault.io";
   const userInitial = displayName.charAt(0).toUpperCase() || "S";
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
+    <div className={`h-screen overflow-hidden ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
       {/* ─── Top Navbar ─── */}
-      <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${
-        isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
-      }`}>
+      <header className={`h-16 shrink-0 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+        }`}>
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-3">
           <button
@@ -167,11 +192,10 @@ export default function Unit({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`Search units in ${subject.code || "subject"} (e.g. Unit I, Water, Trees)...`}
-              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${
-                isDarkMode
+              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${isDarkMode
                   ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
                   : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
-              }`}
+                }`}
             />
             {searchQuery && (
               <button
@@ -189,11 +213,10 @@ export default function Unit({
           {/* Theme Mode Toggle Button */}
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-full border transition-colors cursor-pointer ${
-              isDarkMode
+            className={`p-2 rounded-full border transition-colors cursor-pointer ${isDarkMode
                 ? "border-slate-700 text-amber-300 hover:bg-slate-800"
                 : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-            }`}
+              }`}
             title="Toggle Theme"
           >
             {isDarkMode ? (
@@ -227,9 +250,8 @@ export default function Unit({
 
             {/* Profile Dropdown */}
             {showProfileMenu && (
-              <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${
-                isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
-              }`}>
+              <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
+                }`}>
                 <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                   <p className="text-xs font-semibold truncate">{displayName}</p>
                   <p className="text-[11px] text-slate-400 truncate">{displayEmail}</p>
@@ -271,9 +293,8 @@ export default function Unit({
       {/* ─── Main Shell: Left Sidebar + Content Area ─── */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
-        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 transition-colors ${
-          isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
-        }`}>
+        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 overflow-y-auto transition-colors ${isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
+          }`}>
           <div className="space-y-1.5">
             {/* Dashboard Navigation */}
             <button
@@ -481,27 +502,31 @@ export default function Unit({
           {/* ─── Unit Cards Grid (Medium Card Size with Unit Number & Exact Name) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 max-w-5xl">
             {filteredUnits.map((u) => {
-              const bookmarkId = `${subject.code || subject.id}-${u.id}-notes`;
+              const bookmarkId = `${subject?.code || subject?.id || "BT101"}-${u.id}-notes`;
               const bookmarked = isBookmarked(bookmarkId);
 
               const handleToggleUnitBookmark = (e) => {
                 e.stopPropagation();
+                const cleanSubjectCode = (subject?.code || "BT101").replace("-", "");
+                const defaultUrl = `https://ik.imagekit.io/eduvault_demo/${cleanSubjectCode}_${u.id}_notes.pdf`;
                 const itemToSave = {
                   id: bookmarkId,
                   type: "notes",
                   categoryLabel: "Handwritten Notes",
-                  title: `${subject.code ? `${subject.code} ` : ""}${u.number}: ${u.name}`,
-                  subject: subject.name,
-                  subjectCode: subject.code,
-                  semester: semester.name,
-                  branch: branch.code,
-                  university: university.code,
+                  title: `${subject?.code ? `${subject.code} ` : ""}${u.number}: ${u.name}`,
+                  subject: subject?.name || "",
+                  subjectCode: subject?.code || "",
+                  semester: semester?.name || "",
+                  branch: branch?.code || "",
+                  university: university?.code || "",
                   unit: u.number,
                   description: u.topics,
+                  fileUrl: defaultUrl,
                   date: "Saved",
                 };
 
                 const result = toggleBookmark(itemToSave);
+                setBookmarkCount(getBookmarkCount());
                 showToast(
                   result.bookmarked
                     ? `Saved "${u.number} Notes" to Bookmarks!`
@@ -512,23 +537,20 @@ export default function Unit({
               return (
                 <div
                   key={u.id}
-                  onClick={() => handleUnitClick(u)}
-                  className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer min-h-[125px] sm:min-h-[135px] ${
-                    isDarkMode
+                  onClick={() => handleOpenUnitPdf(u)}
+                  className={`group relative rounded-2xl p-6 border transition-all duration-200 flex flex-col items-center justify-between text-center cursor-pointer min-h-[160px] ${isDarkMode
                       ? "bg-slate-900 border-slate-800 hover:border-[#0284c7]/50 hover:bg-slate-850/80"
                       : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-[#0284c7]/40 hover:-translate-y-0.5"
-                  } ${
-                    selectedUnit?.id === u.id ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
-                  }`}
+                    } ${activeUnit?.id === u.id && showPdfViewer ? "ring-2 ring-[#0284c7] border-[#0284c7]" : ""
+                    }`}
                 >
                   {/* Bookmark Button in Top Right */}
                   <button
                     onClick={handleToggleUnitBookmark}
-                    className={`absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                      bookmarked
+                    className={`absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${bookmarked
                         ? "text-[#0284c7] bg-sky-50 dark:bg-sky-950/70"
                         : "text-slate-300 dark:text-slate-600 hover:text-[#0284c7] hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
+                      }`}
                     title={bookmarked ? "Remove bookmark" : "Save bookmark"}
                   >
                     <svg className="w-4 h-4" fill={bookmarked ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
@@ -536,23 +558,31 @@ export default function Unit({
                     </svg>
                   </button>
 
-                  <span className="text-[11px] font-black tracking-wider uppercase text-[#0284c7] bg-sky-50 dark:text-sky-300 px-3 py-1 rounded-md border border-sky-200/60 dark:border-sky-800/60 mb-2.5">
-                    {u.number}
-                  </span>
+                  <div className="flex flex-col items-center w-full">
+                    <span className="text-[11px] font-black tracking-wider uppercase text-[#0284c7] bg-sky-50 dark:text-sky-300 px-3 py-1 rounded-md border border-sky-200/60 dark:border-sky-800/60 mb-2.5">
+                      {u.number}
+                    </span>
 
-                  <h2
-                    className={`text-base font-bold tracking-tight transition-colors line-clamp-2 ${
-                      isDarkMode
-                        ? "text-white group-hover:text-[#38bdf8]"
-                        : "text-slate-800 group-hover:text-[#0284c7]"
-                    }`}
-                  >
-                    {u.name}
-                  </h2>
+                    <h2
+                      className={`text-base font-bold tracking-tight transition-colors line-clamp-2 ${isDarkMode
+                          ? "text-white group-hover:text-[#38bdf8]"
+                          : "text-slate-800 group-hover:text-[#0284c7]"
+                        }`}
+                    >
+                      {u.name}
+                    </h2>
 
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 line-clamp-2 leading-relaxed">
-                    {u.topics}
-                  </p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                      {u.topics}
+                    </p>
+                  </div>
+
+                  {/* Text-only View PDF Action */}
+                  <div className="mt-4 w-full flex items-center justify-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0284c7] group-hover:underline">
+                      View PDF →
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -560,178 +590,153 @@ export default function Unit({
         </main>
       </div>
 
-      {/* ─── Unit Study Material Modal (ImageKit PDF Viewer & Downloader) ─── */}
-      {selectedUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      {/* ─── In-App Handwritten Notes PDF Viewer Modal with Loading Effect ─── */}
+      {showPdfViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/75 backdrop-blur-xs animate-fade-in">
           <div
-            className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl border ${
-              isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
-            }`}
+            className={`w-full max-w-5xl h-[92vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+              }`}
           >
             {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200">
-                  {selectedUnit.number}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">
-                  {subject.code || "Course"}
-                </span>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/70 dark:bg-slate-900/70">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284c7] shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="truncate">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950 text-[#0284c7] dark:text-sky-300">
+                      {activeUnit?.number || "PDF"}
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold truncate">
+                      {activeUnit?.name || `${subject?.code || "Subject"} Handwritten Notes`}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {subject?.code} • {subject?.name} • {university?.code} • {semester?.name}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setSelectedUnit(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Bookmark Toggle */}
+                <button
+                  onClick={handleToggleActiveUnitBookmark}
+                  className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    activeUnit && isBookmarked(`${subject?.code || subject?.id || "BT101"}-${activeUnit.id}-notes`)
+                      ? "bg-[#e0f2fe] text-[#0284c7] border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800"
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                  title={
+                    activeUnit && isBookmarked(`${subject?.code || subject?.id || "BT101"}-${activeUnit.id}-notes`)
+                      ? "Remove Bookmark"
+                      : "Bookmark this Unit"
+                  }
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill={activeUnit && isBookmarked(`${subject?.code || subject?.id || "BT101"}-${activeUnit.id}-notes`) ? "currentColor" : "none"}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                </button>
+
+                {/* Open in New Tab */}
+                <button
+                  onClick={() => {
+                    if (activePdfUrl) {
+                      window.open(activePdfUrl, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Open in new window"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  <span>New Tab</span>
+                </button>
+
+                {/* Download PDF */}
+                <button
+                  onClick={handleDownloadActiveUnitPdf}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs cursor-pointer"
+                  title="Download Handwritten Notes PDF"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span className="hidden sm:inline">Download</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowPdfViewer(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+                  title="Close PDF Viewer"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* Modal Content */}
-            <h3 className={`text-xl font-bold ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-              {selectedUnit.name}
-            </h3>
-
-            <div className="flex flex-wrap items-center gap-2 my-3 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-[#0284c7]">{subject.name}</span>
-              <span>•</span>
-              <span>{semester.name}</span>
-              <span>•</span>
-              <span>{branch.code}</span>
-            </div>
-
-            {/* Syllabus Topics */}
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 mb-6">
-              <p className="text-[10px] text-slate-400 uppercase font-semibold mb-1">Topics Included</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {selectedUnit.topics}
-              </p>
-            </div>
-
-            {/* Study Material Documents list */}
-            <div className="mb-6">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
-                Available Study Material (ImageKit PDF)
-              </p>
-
-              {loadingMaterials ? (
-                <div className="flex items-center justify-center p-6 gap-2 text-xs text-slate-400">
-                  <div className="w-4 h-4 border-2 border-[#0284c7] border-t-transparent rounded-full animate-spin" />
-                  <span>Loading unit material...</span>
-                </div>
-              ) : unitMaterials.length > 0 ? (
-                <div className="space-y-3">
-                  {unitMaterials.map((mat) => (
-                    <div
-                      key={mat._id}
-                      className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/70 border border-sky-200/50 flex items-center justify-center text-[#0284c7] shrink-0">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                            {mat.title}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            By {mat.author || "RGPV Contributor"} • {mat.file?.pagesCount || 20} Pages
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <button
-                          onClick={() => {
-                            if (mat._id && !mat._id.startsWith("sample-")) {
-                              recordMaterialView(mat._id).catch(() => {});
-                            }
-                            if (mat.file?.url) {
-                              window.open(mat.file.url, "_blank", "noopener,noreferrer");
-                              showToast("Opening PDF document from ImageKit...");
-                            } else {
-                              showToast("Opening document viewer...");
-                            }
-                          }}
-                          className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-xs cursor-pointer"
-                        >
-                          View PDF
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (mat._id && !mat._id.startsWith("sample-")) {
-                              recordMaterialDownload(mat._id).catch(() => {});
-                            }
-                            if (mat.file?.url) {
-                              window.open(mat.file.url, "_blank", "noopener,noreferrer");
-                            }
-                            showToast("Download started!");
-                          }}
-                          className="p-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                          title="Download PDF"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
-                      </div>
+            {/* Modal Body / PDF Frame Container */}
+            <div className="relative flex-1 w-full h-full bg-slate-100 dark:bg-slate-950 overflow-hidden">
+              {/* Loading State Effect */}
+              {pdfLoading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-xs transition-opacity duration-300">
+                  <div className="relative">
+                    <div className="w-12 h-12 border-4 border-[#0284c7]/20 border-t-[#0284c7] rounded-full animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 bg-[#0284c7] rounded-full animate-ping" />
                     </div>
-                  ))}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Loading Handwritten Notes PDF...
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Fetching {activeUnit?.number || "Unit"} study notes from EduVault CDN
+                    </p>
+                  </div>
+                  {/* Subtle skeleton bar animation */}
+                  <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div className="w-full h-full bg-gradient-to-r from-transparent via-[#0284c7] to-transparent animate-pulse" />
+                  </div>
                 </div>
-              ) : (
-                <p className="text-xs text-slate-400 py-3">No documents uploaded for this unit yet.</p>
               )}
-            </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-              <button
-                onClick={() => {
-                  const bookmarkId = `${subject.code || subject.id}-${selectedUnit.id}-notes`;
-                  const itemToSave = {
-                    id: bookmarkId,
-                    type: "notes",
-                    categoryLabel: "Handwritten Notes",
-                    title: `${subject.code ? `${subject.code} ` : ""}${selectedUnit.number}: ${selectedUnit.name}`,
-                    subject: subject.name,
-                    subjectCode: subject.code,
-                    semester: semester.name,
-                    branch: branch.code,
-                    university: university.code,
-                    unit: selectedUnit.number,
-                    description: selectedUnit.topics,
-                    fileUrl: unitMaterials[0]?.file?.url || "",
-                  };
-                  const res = toggleBookmark(itemToSave);
-                  showToast(res.bookmarked ? `Saved ${selectedUnit.number} to Bookmarks!` : "Removed from Bookmarks");
-                }}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-[#0284c7] hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors cursor-pointer"
-              >
-                Bookmark this Unit
-              </button>
-
-              <button
-                onClick={() => setSelectedUnit(null)}
-                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
+              {/* The Actual PDF Display */}
+              {activePdfUrl && (
+                <iframe
+                  src={`${activePdfUrl}#toolbar=1&navpanes=0`}
+                  title={`${activeUnit?.number || "Unit"} Notes`}
+                  className="w-full h-full border-0"
+                  onLoad={() => setPdfLoading(false)}
+                />
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold animate-bounce">
-          <svg className="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{toastMessage}</span>
-        </div>
-      )}
+{/* Toast Notification */ }
+{
+  toastMessage && (
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold animate-bounce">
+      <svg className="w-4 h-4 text-emerald-400 dark:text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+      </svg>
+      <span>{toastMessage}</span>
     </div>
+  )
+}
+    </div >
   );
 }
 

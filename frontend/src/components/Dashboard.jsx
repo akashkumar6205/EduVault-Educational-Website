@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { getBookmarkCount } from "../utils/bookmarkStorage";
+import rgpvLogo from "../assets/rgpv-logo.jpg";
 
 export default function Dashboard({
   onNavigateToHome,
@@ -35,43 +36,13 @@ export default function Dashboard({
       name: "Rajiv Gandhi Proudyogiki Vishwavidyalaya",
       isAvailable: true,
       accentColor: "#dc2626",
+      logoUrl: rgpvLogo,
       logo: (
-        <svg viewBox="0 0 100 100" className="w-16 h-16">
-          <circle cx="50" cy="50" r="46" fill="#fff" stroke="#dc2626" strokeWidth="3" />
-          <circle cx="50" cy="50" r="41" fill="none" stroke="#dc2626" strokeWidth="1" strokeDasharray="2 2" />
-          {/* Emblem details */}
-          <path
-            d="M50 16 L53 26 L63 26 L55 32 L58 42 L50 36 L42 42 L45 32 L37 26 L47 26 Z"
-            fill="#dc2626"
-            opacity="0.9"
-          />
-          <path
-            d="M32 46 C32 60 50 68 50 68 C50 68 68 60 68 46 L68 40 L32 40 Z"
-            fill="none"
-            stroke="#dc2626"
-            strokeWidth="2.5"
-          />
-          {/* Inner torch / book motif */}
-          <path d="M48 45 L52 45 L52 56 L48 56 Z" fill="#dc2626" />
-          <path d="M50 40 C46 43 54 43 50 40" fill="#dc2626" />
-          <path d="M38 58 Q50 64 62 58" stroke="#dc2626" strokeWidth="2" fill="none" />
-          {/* Base ribbon */}
-          <path
-            d="M26 73 Q50 82 74 73 L70 80 Q50 88 30 80 Z"
-            fill="#dc2626"
-          />
-          <text
-            x="50"
-            y="79"
-            textAnchor="middle"
-            fontSize="5.5"
-            fontWeight="bold"
-            fill="#ffffff"
-            letterSpacing="0.5"
-          >
-            BHOPAL
-          </text>
-        </svg>
+        <img
+          src={rgpvLogo}
+          alt="Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV)"
+          className="w-16 h-16 object-contain"
+        />
       ),
     },
   ];
@@ -403,8 +374,9 @@ export default function Dashboard({
                 )}
 
                 {/* University Emblem Container */}
-                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-5 p-2 transition-transform duration-300 ${isDarkMode ? "bg-slate-800" : "bg-white"
-                  } ${uni.isAvailable ? "group-hover:scale-105" : ""}`}>
+                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-5 p-2 bg-white shadow-xs border border-slate-100 dark:border-slate-800 transition-transform duration-300 ${
+                  uni.isAvailable ? "group-hover:scale-105" : ""
+                }`}>
                   {uni.logo}
                 </div>
 

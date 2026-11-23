@@ -59,9 +59,9 @@ export default function Courses({
   );
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
+    <div className={`h-screen overflow-hidden ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
       {/* ─── Top Navbar ─── */}
-      <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+      <header className={`h-16 shrink-0 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
         }`}>
         {/* Left: Brand Logo */}
         <div className="flex items-center gap-3">
@@ -190,7 +190,7 @@ export default function Courses({
       {/* ─── Body Layout: Left Sidebar + Main Content ─── */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
-        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 transition-colors ${isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
+        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 overflow-y-auto transition-colors ${isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
           }`}>
           <div className="space-y-1.5">
             {/* Dashboard (Active) */}

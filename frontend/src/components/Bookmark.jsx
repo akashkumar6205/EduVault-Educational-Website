@@ -7,6 +7,7 @@ import {
   clearAllBookmarks,
   addBookmark,
 } from "../utils/bookmarkStorage";
+import { downloadPdfFile } from "../utils/downloadHelper";
 
 export default function Bookmark({
   onNavigateToDashboard,
@@ -84,17 +85,21 @@ export default function Bookmark({
       b.subject?.toLowerCase().includes(q) ||
       b.subjectCode?.toLowerCase().includes(q) ||
       b.description?.toLowerCase().includes(q) ||
+      b.categoryLabel?.toLowerCase().includes(q) ||
+      b.type?.toLowerCase().includes(q) ||
       b.unit?.toLowerCase().includes(q);
     return matchesSearch;
   });
 
   // Divide into separate sections
+  const syllabusBookmarks = filtered.filter((b) => b.type === "syllabus");
   const notesBookmarks = filtered.filter((b) => b.type === "notes");
   const pyqBookmarks = filtered.filter((b) => b.type === "pyq");
   const importantBookmarks = filtered.filter((b) => b.type === "important");
 
   // Counter totals
   const totalCount = safeBookmarks.length;
+  const syllabusCount = syllabusBookmarks.length;
   const notesCount = notesBookmarks.length;
   const pyqCount = pyqBookmarks.length;
   const importantCount = importantBookmarks.length;
@@ -273,7 +278,7 @@ export default function Bookmark({
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar Navigation */}
         <aside
-          className={`w-64 border-r flex flex-col justify-between p-4 hidden md:flex transition-colors shrink-0 ${
+          className={`w-64 border-r flex flex-col justify-between p-4 md:flex transition-colors shrink-0 ${
             isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
           }`}
         >
@@ -376,7 +381,7 @@ export default function Bookmark({
                 Saved Bookmarks
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Your saved collection divided into Notes, PYQs, and Unit-wise Important Questions.
+                Your saved collection divided into Syllabus, Notes, PYQs, and Unit-wise Important Questions.
               </p>
             </div>
 
@@ -406,7 +411,7 @@ export default function Bookmark({
 
 
           {/* ─── Metric Filter Cards ─── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
             {/* All */}
             <button
               onClick={() => setActiveTab("all")}
@@ -426,6 +431,27 @@ export default function Bookmark({
                 {totalCount}
               </p>
               <p className="text-[10px] text-slate-400 mt-0.5">Total saved items</p>
+            </button>
+
+            {/* Syllabus */}
+            <button
+              onClick={() => setActiveTab("syllabus")}
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                activeTab === "syllabus"
+                  ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-500/10"
+                  : isDarkMode
+                  ? "bg-slate-900 border-slate-800 hover:border-slate-700"
+                  : "bg-white border-slate-100 hover:border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Syllabus</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              </div>
+              <p className={`text-2xl font-black mt-2 ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                {syllabusCount}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Official Syllabus</p>
             </button>
 
             {/* Notes */}
@@ -533,10 +559,111 @@ export default function Bookmark({
           )}
 
           {/* ═════════════════════════════════════════════════════════════ */}
-          {/* ─── SECTION 1: HANDWRITTEN NOTES ─── */}
+          {/* ─── SECTION: OFFICIAL SYLLABUS ─── */}
           {/* ═════════════════════════════════════════════════════════════ */}
           {filtered.length > 0 && (
             <>
+              {(activeTab === "all" || activeTab === "syllabus") && (
+                <section className="mb-12">
+                  <div className="flex items-center justify-between pb-3 mb-5 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className={`text-lg font-bold tracking-tight ${isDarkMode ? "text-white" : "text-slate-900"}`}>
+                            Official Syllabus
+                          </h2>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                            {syllabusBookmarks.length}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Official RGPV curriculum outlines and exam schemes
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {syllabusBookmarks.length === 0 ? (
+                    <div className={`p-6 text-center rounded-2xl border text-xs text-slate-400 ${
+                      isDarkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-100"
+                    }`}>
+                      No official syllabus bookmarked.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {syllabusBookmarks.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className={`group relative rounded-2xl p-5 border transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                            isDarkMode
+                              ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850"
+                              : "bg-white border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-emerald-400/40 hover:-translate-y-0.5"
+                          }`}
+                        >
+                          {/* Top Bar: Subject Badge + Remove Icon */}
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 uppercase">
+                                {item.subjectCode || "Syllabus"}
+                              </span>
+                              <span className="text-[10px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                {item.semester || "RGPV"}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => handleRemove(e, item.id, item.title)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Remove bookmark"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Title & Subject */}
+                          <div>
+                            <h3 className={`text-sm font-bold line-clamp-2 transition-colors ${
+                              isDarkMode ? "text-white group-hover:text-emerald-400" : "text-slate-900 group-hover:text-emerald-600"
+                            }`}>
+                              {item.title}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-1 font-medium">
+                              {item.subject} • {item.branch}
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                              {item.description}
+                            </p>
+                          </div>
+
+                          {/* Footer Details & Action */}
+                          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400 font-medium">
+                              Official Curriculum
+                            </span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 group-hover:underline inline-flex items-center gap-1">
+                              <span>View Syllabus</span>
+                              <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* ═════════════════════════════════════════════════════════════ */}
+              {/* ─── SECTION 1: HANDWRITTEN NOTES ─── */}
+              {/* ═════════════════════════════════════════════════════════════ */}
               {(activeTab === "all" || activeTab === "notes") && (
                 <section className="mb-12">
               <div className="flex items-center justify-between pb-3 mb-5 border-b border-slate-200 dark:border-slate-800">
@@ -856,7 +983,9 @@ export default function Bookmark({
               <div className="flex items-center gap-2">
                 <span
                   className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-lg border ${
-                    selectedItem.type === "notes"
+                    selectedItem.type === "syllabus"
+                      ? "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200"
+                      : selectedItem.type === "notes"
                       ? "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200"
                       : selectedItem.type === "pyq"
                       ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200"
@@ -909,15 +1038,19 @@ export default function Bookmark({
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">Exam Note / Frequency</p>
+                <p className="text-[10px] text-slate-400 uppercase font-semibold">
+                  {selectedItem.type === "syllabus" ? "Document Type" : "Exam Note / Frequency"}
+                </p>
                 <p className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                  {selectedItem.frequency || selectedItem.pages || "End-Sem Syllabus"}
+                  {selectedItem.type === "syllabus"
+                    ? "Official Syllabus PDF"
+                    : selectedItem.frequency || selectedItem.pages || "End-Sem Syllabus"}
                 </p>
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-slate-800 flex-wrap">
               <button
                 onClick={(e) => {
                   handleRemove(e, selectedItem.id, selectedItem.title);
@@ -925,8 +1058,20 @@ export default function Bookmark({
                 }}
                 className="px-4 py-2.5 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
               >
-                Remove from Bookmarks
+                Remove
               </button>
+              {selectedItem.fileUrl && (
+                <button
+                  onClick={async () => {
+                    const fileName = `${selectedItem.subjectCode || "Document"}_${selectedItem.type}.pdf`;
+                    showToast(`Downloading ${fileName}...`);
+                    await downloadPdfFile(selectedItem.fileUrl, fileName);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Download PDF
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (selectedItem.fileUrl) {
@@ -939,7 +1084,7 @@ export default function Bookmark({
                 }}
                 className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0284c7] hover:bg-[#0369a1] text-white transition-all shadow-md cursor-pointer"
               >
-                Open Study Viewer
+                {selectedItem.type === "syllabus" ? "View Syllabus PDF" : "Open Study Viewer"}
               </button>
             </div>
           </div>
