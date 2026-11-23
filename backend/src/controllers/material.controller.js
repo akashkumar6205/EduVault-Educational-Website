@@ -21,7 +21,8 @@ export const getMaterials = async (req, res, next) => {
     const query = { isPublished: true };
 
     if (subjectCode) {
-      query.subjectCode = subjectCode.toUpperCase();
+      const escaped = subjectCode.trim().replace(/[-_]/g, "[-_]?");
+      query.subjectCode = new RegExp(`^${escaped}$`, "i");
     }
 
     if (resourceType) {

@@ -3,6 +3,9 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { getBookmarkCount } from "../utils/bookmarkStorage";
 import { submitServerFeedback } from "../services/api";
+import AppHeader from "../components/AppHeader";
+import AppSidebar from "../components/AppSidebar";
+import MobileBottomNav from "../components/MobileBottomNav";
 
 export default function Feedback({
   onNavigateToDashboard,
@@ -16,8 +19,8 @@ export default function Feedback({
   const { isDarkMode: ctxDarkMode, toggleTheme: ctxToggleTheme } = useTheme();
   const isDarkMode = propIsDarkMode !== undefined ? propIsDarkMode : ctxDarkMode;
   const toggleTheme = onToggleTheme || ctxToggleTheme;
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
@@ -44,8 +47,8 @@ export default function Feedback({
   const userInitial = user?.displayName
     ? user.displayName.charAt(0).toUpperCase()
     : user?.email
-    ? user.email.charAt(0).toUpperCase()
-    : "G";
+      ? user.email.charAt(0).toUpperCase()
+      : "G";
 
   const handleGoogleSignIn = async () => {
     try {
@@ -100,219 +103,44 @@ export default function Feedback({
   };
 
   return (
-    <div className={`h-screen overflow-hidden ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
-      {/* ─── Top Navbar ─── */}
-      <header className={`h-16 shrink-0 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${
-        isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
-      }`}>
-        {/* Left: Brand Logo */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onNavigateToDashboard}
-            className="flex items-center gap-0.5 text-xl tracking-tight cursor-pointer focus:outline-none"
-            title="Return to Dashboard"
-          >
-            <span className={`font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Edu</span>
-            <span className="font-extrabold text-[#0284c7]">Vault</span>
-          </button>
-        </div>
-
-        {/* Center: Search input */}
-        <div className="flex-1 max-w-lg mx-6 hidden sm:block">
-          <div className="relative">
-            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Search questions, topics, or units..."
-              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${
-                isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
-                  : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
-              }`}
-            />
-          </div>
-        </div>
-
-        {/* Right Action Icons */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Theme Mode Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            className={`p-2 rounded-full border transition-colors cursor-pointer ${
-              isDarkMode
-                ? "border-slate-700 text-amber-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-            }`}
-            title="Toggle Theme"
-          >
-            {isDarkMode ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
-
-          {/* User profile avatar / dropdown or Sign In button */}
-          {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border border-slate-300 ring-2 ring-transparent hover:ring-[#0284c7]/40 transition-all cursor-pointer bg-[#7c3aed] text-white"
-                title={displayName}
-              >
-                {user?.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={displayName}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="text-xs font-bold">{userInitial}</span>
-                )}
-              </button>
-
-              {/* Profile Dropdown */}
-              {showProfileMenu && (
-                <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${
-                  isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
-                }`}>
-                  <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-xs font-semibold truncate">{displayName}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{displayEmail}</p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      onNavigateToHome?.();
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                    Landing Page
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      logout();
-                      onNavigateToHome?.();
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={signingIn}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#0284c7] hover:bg-[#0369a1] transition-all cursor-pointer shadow-xs disabled:opacity-60"
-              title="Sign in with Google"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z" />
-              </svg>
-              <span>{signingIn ? "Signing In..." : "Sign In"}</span>
-            </button>
-          )}
-        </div>
-      </header>
+    <div className={`min-h-screen ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
+      {/* ─── Top Responsive Navbar ─── */}
+      <AppHeader
+        onNavigateToDashboard={onNavigateToDashboard}
+        onNavigateToHome={onNavigateToHome}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={toggleTheme}
+        user={user}
+        logout={logout}
+        badgeText="Feedback"
+      />
 
       {/* ─── Body Layout: Left Sidebar + Main Content ─── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 overflow-y-auto transition-colors ${
-          isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
-        }`}>
-          <div className="space-y-1.5">
-            {/* Dashboard */}
-            <button
-              onClick={onNavigateToDashboard}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              <span>Dashboard</span>
-            </button>
-
-
-            {/* Bookmark */}
-            <button
-              onClick={() => {
-                if (onNavigateToBookmark) onNavigateToBookmark();
-                else onNavigateToDashboard();
-              }}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <span>Bookmark</span>
-              </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                {bookmarkCount}
-              </span>
-            </button>
-
-            {/* Rate & Feedback (Active!) */}
-            <button
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
-                isDarkMode
-                  ? "bg-[#0284c7]/20 text-[#38bdf8] border-l-4 border-[#0284c7]"
-                  : "bg-[#e0f2fe]/70 text-[#0284c7] border-l-4 border-[#0284c7]"
-              }`}
-            >
-              <svg className="w-4 h-4 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span>Rate & Feedback</span>
-            </button>
-
-            {/* Settings */}
-            <button
-              onClick={onNavigateToSettings}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Settings</span>
-            </button>
-          </div>
-
-          {/* Bottom user status */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 px-2">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${user ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-              <span className="text-[11px] text-slate-400">
-                {user ? "Signed In" : "Guest (Not signed in)"}
-              </span>
-            </div>
-          </div>
-        </aside>
+        {/* Left Sidebar (Desktop + Mobile Drawer) */}
+        <AppSidebar
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={() => setIsMobileMenuOpen(false)}
+          activeTab="feedback"
+          bookmarkCount={bookmarkCount}
+          onNavigateToDashboard={onNavigateToDashboard}
+          onNavigateToBookmark={onNavigateToBookmark}
+          onNavigateToFeedback={() => { }}
+          onNavigateToSettings={onNavigateToSettings}
+          backShortcuts={[
+            {
+              label: "Back to Dashboard",
+              onClick: onNavigateToDashboard,
+              primary: true,
+            },
+          ]}
+          isDarkMode={isDarkMode}
+        />
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-16 py-10">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-16 py-6 sm:py-10 pb-24 md:pb-10">
           <div className="max-w-2xl mx-auto">
             {/* Header: Speech Bubble Icon + Title + Subtitle */}
             <div className="mb-6">
@@ -381,9 +209,8 @@ export default function Feedback({
 
             {/* Submitted Success Card */}
             {submitted ? (
-              <div className={`rounded-2xl p-8 border text-center shadow-xs ${
-                isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-              }`}>
+              <div className={`rounded-2xl p-8 border text-center shadow-xs ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                }`}>
                 <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -418,9 +245,8 @@ export default function Feedback({
               /* Feedback Form Card */
               <form
                 onSubmit={handleSubmit}
-                className={`rounded-2xl p-6 sm:p-8 border shadow-xs transition-colors ${
-                  isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80"
-                }`}
+                className={`rounded-2xl p-6 sm:p-8 border shadow-xs transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200/80"
+                  }`}
               >
                 {/* 1. Rate Your Experience */}
                 <div className="mb-6">
@@ -462,19 +288,17 @@ export default function Feedback({
                             onMouseLeave={() => {
                               if (user) setHoverRating(0);
                             }}
-                            className={`p-0.5 focus:outline-none transition-transform ${
-                              user ? "hover:scale-110 cursor-pointer" : "cursor-not-allowed"
-                            }`}
+                            className={`p-0.5 focus:outline-none transition-transform ${user ? "hover:scale-110 cursor-pointer" : "cursor-not-allowed"
+                              }`}
                             title={user ? `${star} Star` : "Please sign in to rate"}
                           >
                             <svg
-                              className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${
-                                isFilled
-                                  ? "text-amber-400 fill-amber-400"
-                                  : isDarkMode
+                              className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${isFilled
+                                ? "text-amber-400 fill-amber-400"
+                                : isDarkMode
                                   ? "text-slate-600 fill-transparent hover:text-amber-300"
                                   : "text-slate-300 fill-transparent hover:text-amber-300"
-                              }`}
+                                }`}
                               viewBox="0 0 24 24"
                               stroke="currentColor"
                               strokeWidth="1.6"
@@ -491,13 +315,12 @@ export default function Feedback({
                     </div>
 
                     {/* Dynamic Rating Pill Badge */}
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      !user
-                        ? "bg-slate-100 dark:bg-slate-800 text-slate-400"
-                        : rating > 0
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${!user
+                      ? "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                      : rating > 0
                         ? "bg-[#e0f2fe] text-[#0284c7] dark:bg-sky-950/60 dark:text-sky-300"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
-                    }`}>
+                      }`}>
                       {!user ? "Login to rate" : ratingLabels[hoverRating || rating]}
                     </span>
                   </div>
@@ -535,13 +358,12 @@ export default function Feedback({
                           ? "What do you like about UNITWISE? What features or study files would you like us to add? Feel free to write anything..."
                           : "You must be signed in to write and submit feedback. Please sign in using the button above."
                       }
-                      className={`w-full p-4 rounded-xl text-xs sm:text-sm border transition-all focus:outline-none focus:ring-2 resize-none ${
-                        !user
-                          ? "bg-slate-100/70 border-slate-200 text-slate-400 dark:bg-slate-800/40 dark:border-slate-800 dark:text-slate-500 cursor-not-allowed"
-                          : isDarkMode
+                      className={`w-full p-4 rounded-xl text-xs sm:text-sm border transition-all focus:outline-none focus:ring-2 resize-none ${!user
+                        ? "bg-slate-100/70 border-slate-200 text-slate-400 dark:bg-slate-800/40 dark:border-slate-800 dark:text-slate-500 cursor-not-allowed"
+                        : isDarkMode
                           ? "bg-slate-800/80 border-slate-700 text-slate-100 placeholder-slate-400 focus:bg-slate-800 focus:ring-[#0284c7]/30"
                           : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-[#0284c7]/60 focus:ring-[#0284c7]/30"
-                      }`}
+                        }`}
                     />
                   </div>
 
@@ -649,6 +471,17 @@ export default function Feedback({
           </div>
         </main>
       </div>
+
+      {/* ─── Mobile Bottom Navigation Bar ─── */}
+      <MobileBottomNav
+        activeTab="feedback"
+        bookmarkCount={bookmarkCount}
+        onNavigateToDashboard={onNavigateToDashboard}
+        onNavigateToBookmark={onNavigateToBookmark}
+        onNavigateToFeedback={() => { }}
+        onNavigateToSettings={onNavigateToSettings}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }

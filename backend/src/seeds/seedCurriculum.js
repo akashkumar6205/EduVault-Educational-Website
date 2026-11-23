@@ -538,7 +538,7 @@ export const allSubjectsData = [
 export const seedDatabase = async () => {
   try {
     const mongoURI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/notes_db";
-    
+
     // Mask credentials when printing to logs for security
     const sanitizedURI = mongoURI.replace(/\/\/([^:]+):([^@]+)@/, "//***:***@");
     console.log(`[Seed] Connecting to MongoDB target: ${sanitizedURI}`);
@@ -554,7 +554,7 @@ export const seedDatabase = async () => {
     try {
       await Subject.collection.dropIndex("name_1");
       console.log("[Seed] Dropped legacy unique index 'name_1' on subjects");
-    } catch (_) {}
+    } catch (_) { }
 
     // 1. Seed all 32 Subjects
     console.log(`[Seed] Seeding ${allSubjectsData.length} Subjects with complete units...`);
@@ -588,8 +588,8 @@ export const seedDatabase = async () => {
         author: "RGPV Academic Council",
         file: {
           fileId: `syllabus_${cleanCode.toLowerCase()}`,
-          url: `https://ik.imagekit.io/eduvault_demo/syllabus/${cleanCode}_Syllabus.pdf`,
-          thumbnailUrl: `https://ik.imagekit.io/eduvault_demo/syllabus/${cleanCode}_Syllabus.pdf/ik-thumbnail.jpg`,
+          url: `https://ik.imagekit.io/Akashkumar/syllabus/${cleanCode}_Syllabus.pdf`,
+          thumbnailUrl: `https://ik.imagekit.io/Akashkumar/syllabus/${cleanCode}_Syllabus.pdf/ik-thumbnail.jpg`,
           fileName: `${sub.code}_Official_Syllabus.pdf`,
           fileType: "pdf",
           sizeBytes: 1450000,
@@ -679,20 +679,23 @@ export const seedDatabase = async () => {
       });
     }
 
-    // Upsert materials using a unique key compound: { subjectCode, resourceType, unitNumber, year }
+    // Upsert materials safely without overwriting user-uploaded files
     let materialsSaved = 0;
     for (const mat of materialsToSeed) {
-      await Material.findOneAndUpdate(
-        {
-          subjectCode: mat.subjectCode,
-          resourceType: mat.resourceType,
-          unitNumber: mat.unitNumber || "",
-          year: mat.year || "",
-        },
-        mat,
-        { upsert: true, new: true }
-      );
-      materialsSaved++;
+      const existing = await Material.findOne({
+        subjectCode: mat.subjectCode,
+        resourceType: mat.resourceType,
+        unitNumber: mat.unitNumber || "",
+        year: mat.year || "",
+      });
+
+      if (!existing) {
+        await Material.create(mat);
+        materialsSaved++;
+      } else if (!existing.file?.url || existing.file.url.includes("eduvault_demo")) {
+        await Material.findByIdAndUpdate(existing._id, mat);
+        materialsSaved++;
+      }
     }
 
     console.log(`[Seed] Successfully seeded ${materialsSaved} materials (including Syllabus, Handwritten Notes, PYQs, and Important Topics)!`);

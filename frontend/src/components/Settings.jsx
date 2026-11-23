@@ -3,6 +3,9 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { getBookmarkCount } from "../utils/bookmarkStorage";
 import { updateUserProfile } from "../services/api";
+import AppHeader from "./AppHeader";
+import AppSidebar from "./AppSidebar";
+import MobileBottomNav from "./MobileBottomNav";
 
 export default function Settings({
   onNavigateToDashboard,
@@ -16,10 +19,10 @@ export default function Settings({
 }) {
   const { user, logout } = useAuth();
   const { theme: ctxTheme, setTheme: ctxSetTheme, isDarkMode: ctxDarkMode, toggleTheme: ctxToggleTheme } = useTheme();
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeSection, setActiveSection] = useState("profile");
   const [savedToast, setSavedToast] = useState(false);
   const [bookmarkCount, setBookmarkCount] = useState(() => getBookmarkCount());
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleBookmarkChange = () => setBookmarkCount(getBookmarkCount());
@@ -116,228 +119,53 @@ export default function Settings({
 
   return (
     <div className={`min-h-screen ${isDarkMode ? "bg-slate-950 text-slate-100" : "bg-[#f8fafd] text-slate-800"} flex flex-col font-sans transition-colors duration-200`}>
-      {/* ─── Top Navbar ─── */}
-      <header className={`h-16 border-b px-6 flex items-center justify-between sticky top-0 z-30 transition-colors ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
-        }`}>
-        {/* Left: Brand Logo */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onNavigateToDashboard}
-            className="flex items-center gap-0.5 text-xl tracking-tight cursor-pointer focus:outline-none"
-            title="Return to Dashboard"
-          >
-            <span className={`font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Edu</span>
-            <span className="font-extrabold text-[#0284c7]">Vault</span>
-          </button>
-        </div>
-
-        {/* Center: Search input */}
-        <div className="flex-1 max-w-lg mx-6 hidden sm:block">
-          <div className="relative">
-            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Search settings, preferences..."
-              className={`w-full pl-10 pr-4 py-2 rounded-full text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${isDarkMode
-                  ? "bg-slate-800/80 border-slate-700 text-slate-200 placeholder-slate-400 focus:bg-slate-800"
-                  : "bg-white border border-slate-200 text-slate-700 placeholder-slate-400 shadow-xs focus:border-[#0284c7]/50"
-                }`}
-            />
-          </div>
-        </div>
-
-        {/* Right Action Icons */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Theme Mode Toggle Button */}
-          <button
-            onClick={handleToggleNavbarTheme}
-            className={`p-2 rounded-full border transition-colors ${isDarkMode
-                ? "border-slate-700 text-amber-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              }`}
-            title="Toggle Theme"
-          >
-            {isDarkMode ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
-
-          {/* Palette button */}
-          <button
-            className={`p-2 rounded-full border transition-colors ${isDarkMode
-                ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              }`}
-            title="Color Palette"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4 5 5 0 015-5h4a3 3 0 013 3v1a2 2 0 002 2h1a3 3 0 003-3 7 7 0 10-14 0" />
-            </svg>
-          </button>
-
-          {/* User profile avatar / dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border border-slate-300 ring-2 ring-transparent hover:ring-[#0284c7]/40 transition-all cursor-pointer bg-slate-900 text-white"
-            >
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || "User"}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
-
-            {/* Profile Dropdown */}
-            {showProfileMenu && (
-              <div className={`absolute right-0 mt-2 w-56 rounded-xl border py-2 shadow-xl z-50 animate-fade-in ${isDarkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-100 text-slate-800"
-                }`}>
-                <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                  <p className="text-xs font-semibold truncate">{user?.displayName || "Guest User"}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{user?.email || "guest@eduvault.io"}</p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    onNavigateToHome?.();
-                  }}
-                  className="w-full text-left px-4 py-2 text-xs flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                  Landing Page
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    logout();
-                    onNavigateToHome?.();
-                  }}
-                  className="w-full text-left px-4 py-2 text-xs flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* ─── Top Responsive Navbar ─── */}
+      <AppHeader
+        onNavigateToDashboard={onNavigateToDashboard}
+        onNavigateToHome={onNavigateToHome}
+        isMobileMenuOpen={isMobileMenuOpen}
+        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={handleToggleNavbarTheme}
+        user={user}
+        logout={logout}
+        badgeText="Settings"
+      />
 
       {/* ─── Body Layout: Left Sidebar + Main Content ─── */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <aside className={`w-56 lg:w-64 border-r flex flex-col justify-between py-6 px-3 shrink-0 transition-colors ${isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-white border-slate-100"
-          }`}>
-          <div className="space-y-1.5">
-            {/* Dashboard */}
-            <button
-              onClick={onNavigateToDashboard}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              <span>Dashboard</span>
-            </button>
-
-
-            {/* Bookmark */}
-            <button
-              onClick={() => {
-                if (onNavigateToBookmark) onNavigateToBookmark();
-                else onNavigateToDashboard();
-              }}
-              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <span>Bookmark</span>
-              </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                {bookmarkCount}
-              </span>
-            </button>
-
-            {/* Rate & Feedback */}
-            <button
-              onClick={() => {
-                if (onNavigateToFeedback) onNavigateToFeedback();
-                else onNavigateToDashboard();
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span>Rate & Feedback</span>
-            </button>
-
-            {/* Settings (Active Tab) */}
-            <button
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${isDarkMode
-                  ? "bg-[#0284c7]/20 text-[#38bdf8] border-l-4 border-[#0284c7]"
-                  : "bg-[#e0f2fe]/70 text-[#0284c7] border-l-4 border-[#0284c7]"
-                }`}
-            >
-              <svg className="w-4 h-4 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Settings</span>
-            </button>
-          </div>
-
-          {/* Bottom Back Button */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 px-2">
-            <button
-              onClick={onNavigateToDashboard}
-              className="w-full flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-[#0284c7] dark:hover:text-[#38bdf8] transition-colors py-1 cursor-pointer"
-            >
-              <svg className="w-3.5 h-3.5 text-[#0284c7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span>Back to Dashboard</span>
-            </button>
-          </div>
-        </aside>
+        {/* Left Sidebar (Desktop + Mobile Drawer) */}
+        <AppSidebar
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={() => setIsMobileMenuOpen(false)}
+          activeTab="settings"
+          bookmarkCount={bookmarkCount}
+          onNavigateToDashboard={onNavigateToDashboard}
+          onNavigateToBookmark={onNavigateToBookmark}
+          onNavigateToFeedback={onNavigateToFeedback}
+          onNavigateToSettings={() => { }}
+          backShortcuts={[
+            {
+              label: "Back to Dashboard",
+              onClick: onNavigateToDashboard,
+              primary: true,
+            },
+          ]}
+          isDarkMode={isDarkMode}
+        />
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto px-6 lg:px-12 py-8">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-8 pb-24 md:pb-8">
           {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 text-xs mb-6">
+          <div className="flex items-center gap-2 text-xs overflow-x-auto no-scrollbar py-1 whitespace-nowrap mb-6">
             <button
               onClick={onNavigateToDashboard}
-              className="font-semibold text-slate-600 dark:text-slate-300 hover:text-[#0284c7] transition-colors cursor-pointer"
+              className="font-semibold text-slate-600 dark:text-slate-300 hover:text-[#0284c7] transition-colors cursor-pointer shrink-0"
             >
               Dashboard
             </button>
-            <span className="text-slate-300">›</span>
-            <span className="bg-[#e0f2fe] text-[#0284c7] font-semibold px-3 py-0.5 rounded-full">
+            <span className="text-slate-300 shrink-0">›</span>
+            <span className="bg-[#e0f2fe] text-[#0284c7] font-semibold px-3 py-0.5 rounded-full shrink-0">
               Settings
             </span>
           </div>
@@ -387,10 +215,10 @@ export default function Settings({
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${activeSection === section.id
-                    ? "bg-[#0284c7] text-white shadow-xs"
-                    : isDarkMode
-                      ? "text-slate-400 hover:text-white hover:bg-slate-800"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-[#0284c7] text-white shadow-xs"
+                  : isDarkMode
+                    ? "text-slate-400 hover:text-white hover:bg-slate-800"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   }`}
               >
                 {section.label}
@@ -443,8 +271,8 @@ export default function Settings({
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm border focus:outline-none focus:ring-2 focus:ring-[#0284c7]/30 ${isDarkMode
-                          ? "bg-slate-800 border-slate-700 text-white"
-                          : "bg-white border-slate-200 text-slate-800"
+                        ? "bg-slate-800 border-slate-700 text-white"
+                        : "bg-white border-slate-200 text-slate-800"
                         }`}
                     />
                   </div>
@@ -458,8 +286,8 @@ export default function Settings({
                       value={user?.email || "guest@eduvault.io"}
                       disabled
                       className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm border opacity-70 cursor-not-allowed ${isDarkMode
-                          ? "bg-slate-800 border-slate-700 text-slate-400"
-                          : "bg-slate-100 border-slate-200 text-slate-500"
+                        ? "bg-slate-800 border-slate-700 text-slate-400"
+                        : "bg-slate-100 border-slate-200 text-slate-500"
                         }`}
                     />
                   </div>
@@ -661,13 +489,12 @@ export default function Settings({
                         <div
                           key={item.id}
                           onClick={() => handleModeChange(item.id)}
-                          className={`rounded-xl p-3 border-2 transition-all cursor-pointer flex flex-col justify-between ${
-                            isSelected
-                              ? item.activeBorder
-                              : isDarkMode
+                          className={`rounded-xl p-3 border-2 transition-all cursor-pointer flex flex-col justify-between ${isSelected
+                            ? item.activeBorder
+                            : isDarkMode
                               ? "border-slate-800 bg-slate-800/40 hover:border-slate-700"
                               : "border-slate-200 bg-white hover:border-slate-300"
-                          }`}
+                            }`}
                         >
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
@@ -753,7 +580,7 @@ export default function Settings({
 
           {/* Toast Notification when saved */}
           {savedToast && (
-            <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-2xl animate-fade-in border border-emerald-500">
+            <div className="fixed bottom-20 md:bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-2xl animate-fade-in border border-emerald-500">
               <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
               </svg>
@@ -762,6 +589,17 @@ export default function Settings({
           )}
         </main>
       </div>
+
+      {/* ─── Mobile Bottom Navigation Bar ─── */}
+      <MobileBottomNav
+        activeTab="settings"
+        bookmarkCount={bookmarkCount}
+        onNavigateToDashboard={onNavigateToDashboard}
+        onNavigateToBookmark={onNavigateToBookmark}
+        onNavigateToFeedback={onNavigateToFeedback}
+        onNavigateToSettings={() => { }}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }
